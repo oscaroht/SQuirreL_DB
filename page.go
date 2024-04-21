@@ -52,6 +52,18 @@ func deserializePage(b []byte) *Page {
 	return &Page{}
 }
 
+func (p *Page) getTuplesByTuples(input []Tuple) []Tuple {
+	// Given an different set of Tuples give me all Tuples at the same index
+	// this is useful when a different column (e.i. page) is filtered and this
+	// page should return all rows that were filtered
+
+	output := []Tuple{}
+	for _, tup := range input {
+		output = append(output, p.Tuples[tup.RowID])
+	}
+	return output
+}
+
 func (p *Page) serialize() []byte {
 	b := []byte{}
 	b = append(b, p.Header.serialize()...)

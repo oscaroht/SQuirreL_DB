@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	"reflect"
 )
 
 type Nextable interface {
+	// Has a next function that returns a Tuple and a bool that describes if there are more tuples in the scan.
 	next() (Tuple, bool)
 }
 
@@ -103,6 +103,7 @@ func gt[T dbtype](x [2]T) bool {
 	}
 }
 func ge[T dbtype](x [2]T) bool {
+	// having to do this switch is stupid. Probably skill issue
 	switch x := any(x).(type) {
 	case []smallint:
 		return x[0] >= x[1]
@@ -118,6 +119,7 @@ func ge[T dbtype](x [2]T) bool {
 	}
 }
 func lt[T dbtype](x [2]T) bool {
+	// having to do this switch is stupid. Probably skill issue
 	switch x := any(x).(type) {
 	case []smallint:
 		return x[0] < x[1]
@@ -134,6 +136,7 @@ func lt[T dbtype](x [2]T) bool {
 }
 
 func le[T dbtype](x [2]T) bool {
+	// having to do this switch is stupid. Probably skill issue
 	switch x := any(x).(type) {
 	case []smallint:
 		return x[0] <= x[1]
@@ -152,6 +155,7 @@ func le[T dbtype](x [2]T) bool {
 type filfunc func([2]dbtype) bool
 
 func operatorSelection(operator string) filfunc {
+	// from string operator to operator function
 	switch operator {
 	case "=":
 		return eq
@@ -174,10 +178,9 @@ func operatorSelection(operator string) filfunc {
 func NewFilter(operator string, operand dbtype, child Nextable) Filter {
 	fnc := operatorSelection(operator)
 	return Filter{operand: operand, filterFunc: fnc, child: child}
-
 }
 
-func (f Filter) next() (Tuple, bool) {
+func (f *Filter) next() (Tuple, bool) {
 	tuple, eot := f.child.next()
 	fmt.Printf("Go tuple: %v, check if it macthes %v. EOT %v\n", tuple, f.operand, eot)
 	for !eot { // iterate for as long as there was no return and the table did not end
@@ -216,23 +219,4 @@ func (it *Iterator) next() (Tuple, bool) {
 	it.pointer++
 	fmt.Printf("Incremented iterator to %v\n", it.pointer)
 	return (*it.arr)[it.pointer-1], false
-}
-
-// func (qp *EqFilter) next() (*Row, bool) {
-// 	row, eot := qp.it.next()
-// 	for !eot { // iterate for as long as there was no return and the table did not end
-// 		rowVal := getField(row, qp.f1.con.Operand1)
-// 		if rowVal == qp.f1.con.Operand2 {
-// 			return row, eot
-// 		}
-// 		row, eot = qp.it.next()
-// 	}
-// 	return row, eot
-
-// }
-
-func getField(v *Row, field string) string {
-	r := reflect.ValueOf(v)
-	f := reflect.Indirect(r).FieldByName(field)
-	return string(f.String())
 }

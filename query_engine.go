@@ -20,29 +20,29 @@ func execute_sql(sql string) ([]Tuple, error) {
 		fmt.Printf("Table: %v\n", sqlparser.String(stmt.From))
 
 		from := sqlparser.String(stmt.From)
-		table := tm.TableMap[from]
+		// fmt.Printf("Table Map %v", tm.TableMap)
+		table := tm.getTableByName(from)
+		// fmt.Printf("Table object found: %v", table)
 
-		cols := []Column{}
+		presentationColumns := []Column{}
 		for _, c := range stmt.SelectExprs {
 			switch c := c.(type) {
 			case *sqlparser.AliasedExpr:
 				cas := c.Expr
 				switch cas := cas.(type) {
 				case *sqlparser.ColName:
-					fmt.Print(cas)
-					c := cas.Name
-					fmt.Print(c)
-					col, success := table.getColumnByName(sqlparser.String(c)) // hardcoded for now. Cannot find a way to get the name out
+					col, success := (*table).getColumnByName(sqlparser.String(cas.Name))
 					if success != true {
 						fmt.Printf("Oh no.. column does not exist.")
 					}
-					cols = append(cols, col)
+					presentationColumns = append(presentationColumns, col)
 					// fmt.Printf("Alias Expr not implemented.\n")
 				default:
 					fmt.Printf("Unknown statement type: %T\n", stmt)
 				}
 			case *sqlparser.StarExpr:
-				fmt.Printf("Star select not implement.\n")
+				presentationColumns = table.Columns
+				// fmt.Printf("Star select not implement.\n")
 			case *sqlparser.Nextval:
 				fmt.Printf("Next val not implement.\n")
 			default:
@@ -51,11 +51,12 @@ func execute_sql(sql string) ([]Tuple, error) {
 
 		}
 
-		p := bm.getPage(PageID(cols[0].PageIDs[0])) // for now just take the first column from the where statement
-		fmt.Printf("Page ID is %v with tuples: %v", p.PageID, p.Tuples)
+		// p := bm.getPage(PageID(cols[0].PageIDs[0])) // for now just take the first column from the where statement
+		// fmt.Printf("Page ID is %v with tuples: %v", p.PageID, p.Tuples)
 
-		// create iterator
-		it := NewIterator(&p.Tuples)
+		// // create iterator
+		// it := NewIterator(&p.Tuples) // This starts a sequencial scan of the rows
+		var head Nextable
 
 		if stmt.GroupBy != nil {
 			for _, n := range stmt.GroupBy {
@@ -63,6 +64,11 @@ func execute_sql(sql string) ([]Tuple, error) {
 			}
 			// fmt.Printf("Group clause: %v\n", sqlparser.String(stmt.GroupBy))
 		}
+		if stmt.Distinct != "" {
+			fmt.Printf("DISTINCT NOT YET IMPLEMENTED")
+			// fmt.Printf("Group clause: %v\n", sqlparser.String(stmt.GroupBy))
+		}
+
 		if stmt.Limit != nil {
 			fmt.Printf("Limit clause: %v\n", sqlparser.String(stmt.Limit))
 		}
@@ -79,6 +85,24 @@ func execute_sql(sql string) ([]Tuple, error) {
 			case *sqlparser.ComparisonExpr:
 				fmt.Printf("%v\n", sqlparser.String(whereExpr.Left))
 				fmt.Printf("%v\n", sqlparser.String(whereExpr.Right))
+				left := whereExpr.Left
+				// var head Nextable
+				var it Iterator
+				switch left := left.(type) {
+				case *sqlparser.ColName:
+					// c = left.Name
+					// fmt.Print(c)
+					col, success := table.getColumnByName(sqlparser.String(left.Name))
+					if success != true {
+						fmt.Printf("Oh no.. column does not exist.")
+					}
+					p := bm.getPage(PageID(col.PageIDs[0])) // for now just take the first column from the where statement
+					// fmt.Printf("Page ID is %v with tuples: %v", p.PageID, p.Tuples)
+
+					// create iterator
+					it = NewIterator(&p.Tuples) // This starts a sequencial scan of the rows
+					// var head Nextable = &it
+				}
 				right := whereExpr.Right
 				switch right := right.(type) {
 				case *sqlparser.SQLVal:
@@ -87,19 +111,51 @@ func execute_sql(sql string) ([]Tuple, error) {
 						fmt.Printf("Filter for %v with bit array %v\n", sqlparser.String(right), string(right.Val))
 						i, _ := strconv.Atoi(string(right.Val))
 						filter = NewFilter(whereExpr.Operator, smallint(i), &it) // cast to a smallint now better would be to change everything to a []byte and implement compare functions based on a type iota
+						head = &filter
 						// filter.child = &it
 						fmt.Print(filter)
 					}
 				}
 			}
+		} else {
+			// if there is no WHERE we can use any column to interate. So lets take the 0idx.
+			p := bm.getPage(PageID(presentationColumns[0].PageIDs[0])) // for now just take the first column from the where statement
+			it := NewIterator(&p.Tuples)                               // This starts a sequencial scan of the rows
+			head = &it
 		}
-		ans, eot := filter.next()
+		ans, eot := head.next()
 		var result []Tuple
 		for !eot {
 			fmt.Printf("Ans: %v\n", ans)
-			ans, eot = filter.next()
+			ans, eot = head.next()
 			result = append(result, ans)
 		}
+		// get all of the to be filtered column first sich that the page can be used a maximum number of times
+
+		// for every ans we should get all the columns.
+		// Do this per column such that every page can be used a maximum number of times before swapping
+		ret := [][]Tuple{}
+		for _, c := range presentationColumns {
+			p := bm.getPage(PageID(c.PageIDs[0]))
+			tuples := p.getTuplesByTuples(result)
+			ret = append(ret, tuples)
+		}
+		println("***********\n")
+		fmt.Printf("%v\n\n", sql)
+		// println("-----------------------------------------")
+		for _, col := range presentationColumns {
+			fmt.Printf("|%v", col.ColumnName)
+		}
+		print("|\n")
+		// fmt.Printf("|%v|\n", cols[0].ColumnName)
+		println("-----------------------------------------")
+		for rowIdx := range len(ret[0]) {
+			for _, col := range ret {
+				fmt.Printf("| %v ", col[rowIdx].Value)
+			}
+			fmt.Printf("\n")
+		}
+		println("-----------------------------------------")
 		return result, nil
 	case *sqlparser.DDL:
 		switch stmt.Action {

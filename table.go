@@ -45,7 +45,11 @@ func NewTableManager() *TableManager {
 }
 
 func (tm *TableManager) getTableByName(name string) *TableDescription {
-	return tm.TableMap[name]
+	x, found := tm.TableMap[name]
+	if !found {
+		fmt.Printf("TABLE %v does not exist.", name)
+	}
+	return x
 }
 
 //	func (tm *TableManager) setTable(table Table) {
