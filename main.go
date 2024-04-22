@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
+	"log/slog"
 	"math/rand"
 	"time"
 )
@@ -154,11 +154,13 @@ func randomStr() string {
 
 	// Displaying the random string
 	str := string(ran_str)
-	// fmt.Println(str)
 	return str
 }
 
 func main() {
+
+	slog.SetLogLoggerLevel(slog.LevelInfo)
+	slog.Info("Logger initiated")
 
 	bm = NewBufferManager()
 	tm = NewTableManager()
@@ -208,13 +210,13 @@ func main() {
 	// 	}
 	// }
 
-	sql := "CREATE TABLE sensor (sensorid smallint, location text, ts int, temperature smallint);"
-	tuples, err := execute_sql(sql)
-	sql = "INSERT INTO sensor VALUES (1, 'Amsterdam', 1, 17);"
-	tuples, err = execute_sql(sql)
-	sql = "SELECT sensorid FROM sensor where sensorid = 1 limit 10"
-	tuples, err = execute_sql(sql)
-	fmt.Printf("Tuples: %v, errors: %v", tuples, err)
+	// sql := "CREATE TABLE sensor (sensorid smallint, location text, ts int, temperature smallint);"
+	// tuples, err := execute_sql(sql)
+	// sql = "INSERT INTO sensor VALUES (1, 'Amsterdam', 1, 17);"
+	// tuples, err = execute_sql(sql)
+	// sql = "SELECT sensorid FROM sensor where sensorid = 1 limit 10"
+	// tuples, err = execute_sql(sql)
+	// fmt.Printf("Tuples: %v, errors: %v", tuples, err)
 
-	// StartPromt("randomfile")
+	StartPromt("randomfile")
 }

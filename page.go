@@ -68,10 +68,6 @@ func (p *Page) serialize() []byte {
 	b := []byte{}
 	b = append(b, p.Header.serialize()...)
 	binary.LittleEndian.PutUint64(b, uint64(p.LatestUse))
-	//slotarray
-	//tuples
-	//
-	//
 	return b
 }
 

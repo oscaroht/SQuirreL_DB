@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"log/slog"
 	"time"
 )
 
@@ -29,7 +29,7 @@ func (b BufferManager) getPage(pageID PageID) *Page {
 	// Given the page ID return a pointer to the page.
 	idx, ok := b.PageTable[pageID]
 	if !ok {
-		fmt.Printf("Implementation error. Page %v is not is buffer. Should get it from disk. Not implemented yet.", pageID)
+		slog.Error("Implementation error. Page is not is buffer. Should get it from disk. Not implemented yet.", "pageid", pageID)
 	}
 	pagePointer := b.BufferPool[idx]
 	(*pagePointer).LatestUse = uint64(time.Now().UnixMilli())
@@ -37,7 +37,7 @@ func (b BufferManager) getPage(pageID PageID) *Page {
 }
 func (b *BufferManager) addPage(page *Page) {
 	if len(b.FreeList) == 0 {
-		fmt.Println("BufferPool exceeded")
+		slog.Debug("BufferPool exceeded. Evict LRU page from pool")
 		b.evictLRUPage()
 		return
 	}
@@ -45,7 +45,7 @@ func (b *BufferManager) addPage(page *Page) {
 	b.FreeList = b.FreeList[1:] // remove 0 idx
 	b.BufferPool[idx] = page
 	b.PageTable[page.PageID] = idx
-	fmt.Printf("Added page id %v to frame %v\n", page.PageID, idx)
+	slog.Info("Added page and frame", "pageid", page.PageID, "frame", idx)
 }
 func (b BufferManager) evictLRUPage() {
 	// find the page to replace
@@ -53,9 +53,9 @@ func (b BufferManager) evictLRUPage() {
 	// remove the page from the page table and add the frame idx to the free list
 	p := b.getLeastRecentlyUsed()
 	pid := (*p).PageID
-	fmt.Printf("Page %v was least used so it's frame can now be taken by another page\n", pid)
-	frame_idx := b.PageTable[pid]
-	b.FreeList = append(b.FreeList, frame_idx)
+	frameIdx := b.PageTable[pid]
+	slog.Debug("Remove page from pool by adding it's slot to freelist", "pageid", pid, "frameidx", frameIdx)
+	b.FreeList = append(b.FreeList, frameIdx)
 	delete(b.PageTable, pid) // delete from the page table
 }
 func (b BufferManager) getLeastRecentlyUsed() *Page {

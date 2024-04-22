@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"log/slog"
+
 	prompt "github.com/c-bata/go-prompt"
 )
 
@@ -27,6 +29,15 @@ func getExecutor(file string) func(string) {
 		case ".quit", ".exit":
 			fmt.Print("Goodbye!\n")
 			os.Exit(0)
+		case ".setloglevel 1":
+			slog.SetLogLoggerLevel(slog.LevelDebug)
+			slog.Debug("Log level set to", "loglevel", 1)
+		case ".setloglevel 2":
+			slog.SetLogLoggerLevel(slog.LevelInfo)
+			slog.Info("Log level set to", "loglevel", 2)
+		case ".setloglevel 3":
+			slog.SetLogLoggerLevel(slog.LevelWarn)
+			slog.Info("Log level set to", "loglevel", 3)
 		default:
 			execute_sql(s)
 		}
