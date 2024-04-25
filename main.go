@@ -32,6 +32,14 @@ import (
 // In this sub project I try out column storage
 // I will store the sensor data again
 
+type NotImplementedError struct {
+	message string
+}
+
+func (d *NotImplementedError) Error() string {
+	return d.message
+}
+
 var bm *BufferManager
 var tm *TableManager
 

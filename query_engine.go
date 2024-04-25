@@ -2,26 +2,52 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"strconv"
 
 	"github.com/xwb1989/sqlparser"
 )
 
+type QueryError struct {
+	msg string
+}
+
+func (d *QueryError) Error() string {
+	return d.msg
+}
+func NewQueryError(m string) *QueryError {
+	return &QueryError{msg: m}
+}
+
+type result struct {
+	sql     string
+	columns []string
+	table   [][]Tuple
+	message string // message to feed back to user for queries with no output e.g. 'Table created'
+}
+
+func NewResult(sql string, columns []string, table [][]Tuple, m string) *result {
+	return &result{sql: sql, columns: columns, table: table, message: m}
+}
+
 func execute_sql(sql string) ([]Tuple, error) {
 	stmt, err := sqlparser.Parse(sql)
 	if err != nil {
-		fmt.Printf("Error parsing SQL: %s\n", err.Error())
+		// fmt.Printf("Error parsing SQL: %s\n", err.Error())
 		return nil, err
 	}
 	switch stmt := stmt.(type) {
 	case *sqlparser.Select:
 		// fmt.Printf("SELECT statement: %v\n", sqlparser.String(stmt))
-		fmt.Printf("Columns: %v\n", sqlparser.String(stmt.SelectExprs))
-		fmt.Printf("Table: %v\n", sqlparser.String(stmt.From))
+		slog.Debug("", "Columns: ", sqlparser.String(stmt.SelectExprs))
+		slog.Debug("", "Table: ", sqlparser.String(stmt.From))
 
 		from := sqlparser.String(stmt.From)
 		// fmt.Printf("Table Map %v", tm.TableMap)
-		table := tm.getTableByName(from)
+		table, error := tm.getTableByName(from)
+		if error != nil {
+			return nil, &QueryError{fmt.Sprintf("Table %v does not exist.", from)}
+		}
 		// fmt.Printf("Table object found: %v", table)
 
 		presentationColumns := []Column{}
@@ -31,22 +57,21 @@ func execute_sql(sql string) ([]Tuple, error) {
 				cas := c.Expr
 				switch cas := cas.(type) {
 				case *sqlparser.ColName:
-					col, success := (*table).getColumnByName(sqlparser.String(cas.Name))
-					if success != true {
-						fmt.Printf("Oh no.. column does not exist.")
+					col, error := (*table).getColumnByName(sqlparser.String(cas.Name))
+					if error != nil {
+						return nil, &QueryError{"Column does not exist"}
 					}
 					presentationColumns = append(presentationColumns, col)
 					// fmt.Printf("Alias Expr not implemented.\n")
 				default:
-					fmt.Printf("Unknown statement type: %T\n", stmt)
+					return nil, &NotImplementedError{fmt.Sprintf("Unknow statement type: %T\n", stmt)}
 				}
 			case *sqlparser.StarExpr:
 				presentationColumns = table.Columns
-				// fmt.Printf("Star select not implement.\n")
 			case *sqlparser.Nextval:
-				fmt.Printf("Next val not implement.\n")
+				return nil, &NotImplementedError{"Nextval not implemented."}
 			default:
-				fmt.Printf("Unknown statement type: %T\n", stmt)
+				return nil, &NotImplementedError{fmt.Sprintf("Unknow statement type: %T\n", stmt)}
 			}
 
 		}
@@ -59,32 +84,34 @@ func execute_sql(sql string) ([]Tuple, error) {
 		var head Nextable
 
 		if stmt.GroupBy != nil {
-			for _, n := range stmt.GroupBy {
-				fmt.Printf("%v\n", sqlparser.String(n))
-			}
+			return nil, &NotImplementedError{"Group by not implemented"}
+			// for _, n := range stmt.GroupBy {
+			// 	fmt.Printf("%v\n", sqlparser.String(n))
+			// }
 			// fmt.Printf("Group clause: %v\n", sqlparser.String(stmt.GroupBy))
 		}
 		if stmt.Distinct != "" {
-			fmt.Printf("DISTINCT NOT YET IMPLEMENTED")
+			return nil, &NotImplementedError{"Distinct not implemented"}
 			// fmt.Printf("Group clause: %v\n", sqlparser.String(stmt.GroupBy))
 		}
 
 		if stmt.Limit != nil {
-			fmt.Printf("Limit clause: %v\n", sqlparser.String(stmt.Limit))
+			slog.Error("Limit not implemented")
 		}
 		filter := Filter{}
 		if stmt.Where != nil {
-			fmt.Printf("%v\n", stmt.Where.Type)
+			slog.Debug("", "Where type", stmt.Where.Type)
 
-			fmt.Printf("Where clause: %v\n", sqlparser.String(stmt.Where.Expr))
+			slog.Debug("", "Where clause", sqlparser.String(stmt.Where.Expr))
 			whereExpr := stmt.Where.Expr
 			switch whereExpr := whereExpr.(type) {
 			case *sqlparser.AndExpr:
-				fmt.Printf("%v\n", sqlparser.String(whereExpr.Left))
-				fmt.Printf("%v\n", sqlparser.String(whereExpr.Right))
+				// fmt.Printf("%v\n", sqlparser.String(whereExpr.Left))
+				// fmt.Printf("%v\n", sqlparser.String(whereExpr.Right))
+				return nil, &NotImplementedError{"AndExpr not implemented"}
 			case *sqlparser.ComparisonExpr:
-				fmt.Printf("%v\n", sqlparser.String(whereExpr.Left))
-				fmt.Printf("%v\n", sqlparser.String(whereExpr.Right))
+				// fmt.Printf("%v\n", sqlparser.String(whereExpr.Left))
+				// fmt.Printf("%v\n", sqlparser.String(whereExpr.Right))
 				left := whereExpr.Left
 				// var head Nextable
 				var it Iterator
@@ -92,9 +119,9 @@ func execute_sql(sql string) ([]Tuple, error) {
 				case *sqlparser.ColName:
 					// c = left.Name
 					// fmt.Print(c)
-					col, success := table.getColumnByName(sqlparser.String(left.Name))
-					if success != true {
-						fmt.Printf("Oh no.. column does not exist.")
+					col, error := table.getColumnByName(sqlparser.String(left.Name))
+					if error != nil {
+						return nil, &QueryError{fmt.Sprintf("Column %v does not exist", sqlparser.String(left.Name))}
 					}
 					p := bm.getPage(PageID(col.PageIDs[0])) // for now just take the first column from the where statement
 					// fmt.Printf("Page ID is %v with tuples: %v", p.PageID, p.Tuples)
@@ -108,13 +135,14 @@ func execute_sql(sql string) ([]Tuple, error) {
 				case *sqlparser.SQLVal:
 					if right.Type == 1 { // this is a int
 						//integer
-						fmt.Printf("Filter for %v with bit array %v\n", sqlparser.String(right), string(right.Val))
+						slog.Debug("Filter with", "filer", sqlparser.String(right), "bit array", string(right.Val))
 						i, _ := strconv.Atoi(string(right.Val))
 						filter = NewFilter(whereExpr.Operator, smallint(i), &it) // cast to a smallint now better would be to change everything to a []byte and implement compare functions based on a type iota
 						head = &filter
 						// filter.child = &it
-						fmt.Print(filter)
 					}
+				default:
+					return nil, &NotImplementedError{fmt.Sprintf("Unknow statement type: %T\n", right)}
 				}
 			}
 		} else {
@@ -126,7 +154,7 @@ func execute_sql(sql string) ([]Tuple, error) {
 		ans, eot := head.next()
 		var result []Tuple
 		for !eot {
-			fmt.Printf("Ans: %v\n", ans)
+			slog.Debug("Found rows", "Ans", ans)
 			ans, eot = head.next()
 			result = append(result, ans)
 		}
@@ -170,19 +198,23 @@ func execute_sql(sql string) ([]Tuple, error) {
 			// fmt.Printf("Table to create has columns: %v", cols)
 			t := tm.CreateTable(tblName, cols)
 			bm.bufferNewTable(t)
-			fmt.Printf("Created table with name %v and columns %v\n", t.TableName, t.Columns)
+			slog.Debug("Created table.", "table name", t.TableName, "columns", t.Columns)
 
 		}
 	case *sqlparser.Insert:
 		switch stmt.Action {
 		case "insert":
 			tblName := sqlparser.String(stmt.Table.Name)
-			table := tm.getTableByName(tblName) // because this is a
+			table, error := tm.getTableByName(tblName) // because this is a
+			if error != nil {
+				return nil, &QueryError{fmt.Sprintf("Table %v does not exist.", tblName)}
+			}
 			rows := stmt.Rows
 			switch rows := rows.(type) {
 			case sqlparser.Values:
 				if len(table.Columns) != len(rows[0]) {
-					fmt.Printf("Number of columns %v do not match query num cols %v\n", len(table.Columns), len(rows[0]))
+					// fmt.Printf("Number of columns %v do not match query num cols %v\n", len(table.Columns), len(rows[0]))
+					return nil, &QueryError{"Number of columns in insert statement does not match with the number of columns in the table."}
 				}
 				for _, r := range rows {
 					for i, cell := range r {
@@ -199,14 +231,14 @@ func execute_sql(sql string) ([]Tuple, error) {
 
 			// cols := stmt.Columns // there are none
 			// insert into every page based on the order of the
-			fmt.Printf("Inserted in table with name %v, rows %v\n", tblName, rows)
-			fmt.Printf("Table now has %v rows\n", tm.getTableByName(tblName).SerialRowID)
-			fmt.Printf("TM Table now looks like %v\n", tm.getTableByName(tblName))
-			fmt.Printf("Page 0,1,2,3 now looks like %v, %v, %v, %v\n", bm.getPage(0).Tuples, bm.getPage(1).Tuples, bm.getPage(2).Tuples, bm.getPage(3).Tuples)
+			// fmt.Printf("Inserted in table with name %v, rows %v\n", tblName, rows)
+			// fmt.Printf("Table now has %v rows\n", tm.getTableByName(tblName).SerialRowID)
+			// fmt.Printf("TM Table now looks like %v\n", tm.getTableByName(tblName))
+			// fmt.Printf("Page 0,1,2,3 now looks like %v, %v, %v, %v\n", bm.getPage(0).Tuples, bm.getPage(1).Tuples, bm.getPage(2).Tuples, bm.getPage(3).Tuples)
 
 		}
 	default:
-		fmt.Printf("Unknown statement type: %T\n", stmt)
+		return nil, &NotImplementedError{fmt.Sprintf("Unknow statement type: %T\n", stmt)}
 	}
 	return []Tuple{}, nil
 }

@@ -39,7 +39,11 @@ func getExecutor(file string) func(string) {
 			slog.SetLogLoggerLevel(slog.LevelWarn)
 			slog.Info("Log level set to", "loglevel", 3)
 		default:
-			execute_sql(s)
+			_, error := execute_sql(s)
+			if error != nil {
+				slog.Error("ERROR: " + error.Error())
+			}
+
 		}
 
 	}

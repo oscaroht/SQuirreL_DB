@@ -5,6 +5,14 @@ import (
 	"strconv"
 )
 
+type TableError struct {
+	msg string
+}
+
+func (d *TableError) Error() string {
+	return d.msg
+}
+
 type TableDescription struct {
 	TableID     uint16
 	TableName   string
@@ -12,15 +20,15 @@ type TableDescription struct {
 	SerialRowID uint32
 }
 
-func (t TableDescription) getColumnByName(name string) (Column, bool) {
+func (t TableDescription) getColumnByName(name string) (Column, error) {
 	fmt.Printf("Check if %v matches any of columns %v", t.Columns, name)
 	for _, c := range t.Columns {
-		fmt.Printf("Check if %v matches %v\n", c.ColumnName, name)
+		// fmt.Printf("Check if %v matches %v\n", c.ColumnName, name)
 		if c.ColumnName == name {
-			return c, true
+			return c, nil
 		}
 	}
-	return Column{}, false
+	return Column{}, &TableError{"Column not found"}
 }
 
 type Column struct {
@@ -44,12 +52,12 @@ func NewTableManager() *TableManager {
 	return &TableManager{TableMap: map[string]*TableDescription{}, tableIDCount: 0}
 }
 
-func (tm *TableManager) getTableByName(name string) *TableDescription {
+func (tm *TableManager) getTableByName(name string) (*TableDescription, error) {
 	x, found := tm.TableMap[name]
 	if !found {
-		fmt.Printf("TABLE %v does not exist.", name)
+		return nil, &TableError{"table does not exist."}
 	}
-	return x
+	return x, nil
 }
 
 //	func (tm *TableManager) setTable(table Table) {
