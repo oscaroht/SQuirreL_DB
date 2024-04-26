@@ -1,8 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"strconv"
+
+	"golang.org/x/exp/slog"
 )
 
 type TableError struct {
@@ -21,7 +22,7 @@ type TableDescription struct {
 }
 
 func (t TableDescription) getColumnByName(name string) (Column, error) {
-	fmt.Printf("Check if %v matches any of columns %v", t.Columns, name)
+	// fmt.Printf("Check if %v matches any of columns %v", t.Columns, name)
 	for _, c := range t.Columns {
 		// fmt.Printf("Check if %v matches %v\n", c.ColumnName, name)
 		if c.ColumnName == name {
@@ -69,12 +70,13 @@ func (tm *TableManager) insertIntoTable(t *TableDescription, colIdx int, rowid u
 	// page will complain when the page is full
 	// someone needs to instruct the bm to get
 	// a new page
-	fmt.Printf("Insert value %v in table %v\n", val, t.TableName)
+	slog.Debug("Insert ", "value", val, "table", t.TableName)
 	c := t.Columns[colIdx]
-	fmt.Printf("Columns found: %v\n", c)
-	fmt.Printf("Pages for this column %v\n", c.PageIDs)
+
+	slog.Debug("Columns", "found", c)
+	slog.Debug("Pages for this ", "column", c.PageIDs)
 	pageid := c.PageIDs[len(c.PageIDs)-1]
-	fmt.Printf("Page id %v\n", pageid)
+	slog.Debug("", "Page id", pageid)
 	page := bm.getPage(pageid)
 	var tupleVal dbtype
 	switch typeint {
@@ -84,9 +86,9 @@ func (tm *TableManager) insertIntoTable(t *TableDescription, colIdx int, rowid u
 		i, _ := strconv.Atoi(val)
 		tupleVal = smallint(i)
 	}
-	fmt.Printf("Create new tuple with type %v\n", typeint)
+	slog.Debug("Create new tuple with", "type", typeint)
 	tup := Tuple{RowID: rowid, Value: tupleVal}
-	fmt.Printf("Append tuple\n")
+	slog.Debug("Append tuple\n")
 	page.appendTuple(tup)
 
 }

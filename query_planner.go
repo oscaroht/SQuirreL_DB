@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 )
 
 type Nextable interface {
@@ -71,6 +72,7 @@ func eq[Q comparable](x [2]Q) bool {
 	// 	return false
 	// }
 	// fmt.Printf("Check if %v matches %v\n", x[0], x[1])
+	slog.Debug("Evaluate == for.", "operand", x[0], "operand", x[1])
 	return x[0] == x[1]
 }
 func ne[Q comparable](x [2]Q) bool { // this means the function takes any 2 things as long as they are comaprable
@@ -98,7 +100,7 @@ func gt[T dbtype](x [2]T) bool {
 	case []text:
 		return x[0] > x[1]
 	default:
-		fmt.Printf("Unable to compare type %v\n", x)
+		// fmt.Printf("Unable to compare type %v\n", x)
 		return false
 	}
 }
@@ -182,15 +184,13 @@ func NewFilter(operator string, operand dbtype, child Nextable) Filter {
 
 func (f *Filter) next() (Tuple, bool) {
 	tuple, eot := f.child.next()
-	fmt.Printf("Go tuple: %v, check if it macthes %v. EOT %v\n", tuple, f.operand, eot)
+	slog.Debug("Check filter", "tuple", tuple, "operand", f.operand, "eot", eot)
 	for !eot { // iterate for as long as there was no return and the table did not end
 		// rowVal := getField(tuple, eqfilter.filter.con.Operand1)
 		arr := [2]dbtype{tuple.Value, f.operand}
-
 		check := f.filterFunc(arr)
-		fmt.Printf("%v\n", check)
 		if check {
-			fmt.Printf("Filter condition satisfied so let's return")
+			slog.Debug("Condition satisfied. Return tuple")
 			return tuple, eot
 		}
 		tuple, eot = f.child.next()
@@ -213,10 +213,10 @@ func NewIterator(arr *[]Tuple) Iterator {
 
 func (it *Iterator) next() (Tuple, bool) {
 	if it.pointer == len(*it.arr) {
-		fmt.Println("EOT")
+		// fmt.Println("EOT")
 		return (*it.arr)[0], true
 	}
 	it.pointer++
-	fmt.Printf("Incremented iterator to %v\n", it.pointer)
+	// fmt.Printf("Incremented iterator to %v\n", it.pointer)
 	return (*it.arr)[it.pointer-1], false
 }

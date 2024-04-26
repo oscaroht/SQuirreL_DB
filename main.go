@@ -167,7 +167,7 @@ func randomStr() string {
 
 func main() {
 
-	slog.SetLogLoggerLevel(slog.LevelInfo)
+	slog.SetLogLoggerLevel(slog.LevelDebug)
 	slog.Info("Logger initiated")
 
 	bm = NewBufferManager()

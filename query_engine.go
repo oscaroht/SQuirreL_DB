@@ -135,9 +135,10 @@ func execute_sql(sql string) ([]Tuple, error) {
 				case *sqlparser.SQLVal:
 					if right.Type == 1 { // this is a int
 						//integer
-						slog.Debug("Filter with", "filer", sqlparser.String(right), "bit array", string(right.Val))
+						slog.Debug("Filter with", "filer", sqlparser.String(right), "operand", string(right.Val))
 						i, _ := strconv.Atoi(string(right.Val))
 						filter = NewFilter(whereExpr.Operator, smallint(i), &it) // cast to a smallint now better would be to change everything to a []byte and implement compare functions based on a type iota
+						slog.Debug("Created filter.", "filter", filter)
 						head = &filter
 						// filter.child = &it
 					}
@@ -154,7 +155,7 @@ func execute_sql(sql string) ([]Tuple, error) {
 		ans, eot := head.next()
 		var result []Tuple
 		for !eot {
-			slog.Debug("Found rows", "Ans", ans)
+			slog.Debug("Rows emerged at presentation layer", "tuple", ans)
 			ans, eot = head.next()
 			result = append(result, ans)
 		}
