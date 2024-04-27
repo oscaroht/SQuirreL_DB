@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-const BUFFER_POOL_SIZE = 10 // times 4kB
+const BUFFER_POOL_SIZE = 100 // times 4kB
 type PageID uint16
 type FrameIndex uint16
 

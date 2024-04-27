@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"log/slog"
 	"math/rand"
 	"time"
@@ -173,58 +174,35 @@ func main() {
 	bm = NewBufferManager()
 	tm = NewTableManager()
 
-	// var table []Row
+	sql := "CREATE TABLE sensor (sensorid smallint, location text, ts int, temperature smallint);"
+	result, err := execute_sql(sql)
+	fmt.Println(err)
+	printFormattedResponse(result)
+	sql = "INSERT INTO sensor VALUES (1, 'Amsterdam', 1, 17);"
+	result, err = execute_sql(sql)
+	fmt.Println(err)
+	printFormattedResponse(result)
 
-	// for t := range 1000 {
-	// 	for i := range 100 {
-	// 		r := Row{SensorID: smallint(i), Location: text(randomStr()), Timestamp: integer(1701 + t)}
-	// 		table = append(table, r)
-	// 	}
-	// }
+	sql = "INSERT INTO sensor VALUES (1, 'Amsterdam', 3, 17);"
+	result, err = execute_sql(sql)
+	fmt.Println(err)
+	printFormattedResponse(result)
 
-	// columns := []Column{{ColumnName: "RowID", ColumnType: "int"}, // uint8(1)}, // 16 bit int
-	// 	{ColumnName: "SensorID", ColumnType: "smallint"},    //,uint8(1)},    // 16 bit int
-	// 	{ColumnName: "Location", ColumnType: "text"},        // uint8(2)},    // str
-	// 	{ColumnName: "Timestamp", ColumnType: "int"},        // uint8(3)},   // 32 bit int
-	// 	{ColumnName: "Temperature", ColumnType: "smallint"}, // uint8(1)}} // 16 bit int
-	// }
+	sql = "INSERT INTO sensor VALUES (1, 'Amsterdam', 2, 17);"
+	result, err = execute_sql(sql)
+	fmt.Println(err)
+	printFormattedResponse(result)
 
-	// t := tm.CreateTable("sensor_tbl", columns)
-	// bm.bufferNewTable(t)
+	sql = "SELECT ts FROM sensor order by ts"
+	result, err = execute_sql(sql)
+	fmt.Println(err)
+	printFormattedResponse(result)
 
-	// rowNm := 0
-	// for t := range 1000 {
-	// 	for i := range 100 {
-	// 		rowNm++
-	// 		r := Row{RowID: smallint(rowNm), SensorID: smallint(uint16(i)), Location: text(randomStr()), Timestamp: integer(1701 + t), Temperature: smallint(rand.Intn(30))}
-	// 		for pageID, col := range []string{"RowID", "SensorID", "Location", "Timestamp", "Temperature"} {
-	// 			p := bm.getPage(PageID(pageID))
+	a := smallint(1)
+	b := smallint(2)
+	c := [2]dbtype{a, b}
+	fmt.Print("test ")
+	fmt.Print(lt(c))
 
-	// 			var tup Tuple
-	// 			switch {
-	// 			case col == "RowID":
-	// 				tup = Tuple{RowID: uint32(rowNm), Value: r.RowID}
-	// 			case col == "SensorID":
-	// 				tup = Tuple{RowID: uint32(rowNm), Value: r.SensorID}
-	// 			case col == "Location":
-	// 				tup = Tuple{RowID: uint32(rowNm), Value: r.Location}
-	// 			case col == "Timestamp":
-	// 				tup = Tuple{RowID: uint32(rowNm), Value: r.Timestamp}
-	// 			case col == "Temperature":
-	// 				tup = Tuple{RowID: uint32(rowNm), Value: r.Temperature}
-	// 			}
-	// 			p.appendTuple(tup)
-	// 		}
-	// 	}
-	// }
-
-	// sql := "CREATE TABLE sensor (sensorid smallint, location text, ts int, temperature smallint);"
-	// tuples, err := execute_sql(sql)
-	// sql = "INSERT INTO sensor VALUES (1, 'Amsterdam', 1, 17);"
-	// tuples, err = execute_sql(sql)
-	// sql = "SELECT sensorid FROM sensor where sensorid = 1 limit 10"
-	// tuples, err = execute_sql(sql)
-	// fmt.Printf("Tuples: %v, errors: %v", tuples, err)
-
-	StartPromt("randomfile")
+	// StartPromt("randomfile")
 }

@@ -137,7 +137,7 @@ func execute_sql(sql string) (*QueryResult, error) {
 						//integer
 						slog.Debug("Filter with", "filer", sqlparser.String(right), "operand", string(right.Val))
 						i, _ := strconv.Atoi(string(right.Val))
-						filter = NewFilter(whereExpr.Operator, smallint(i), head) // cast to a smallint now better would be to change everything to a []byte and implement compare functions based on a type iota
+						filter = NewFilter(whereExpr.Operator, integer(i), head) // cast to a smallint now better would be to change everything to a []byte and implement compare functions based on a type iota
 						slog.Debug("Created filter.", "filter", filter)
 						head = &filter
 						// filter.child = &it

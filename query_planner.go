@@ -40,16 +40,24 @@ func insertionSort(a *[]Tuple, input Tuple, direction string) {
 }
 
 func (ob OrderBy) next() (Tuple, bool) {
+	// OrderBy: collect all tuples and insert them in order. Because next() returns 1 tuple at the time
+	// an iterator is needed to iterate through the sorted tuples. This iterator will push the tuples
+	// up to the next level.
 	if !ob.fetched {
 		tuple, eot := ob.child.next()
+		if eot {
+			return Tuple{}, true
+		}
 		for !eot { // iterate for as long as there was no return and the table did not end
 			slog.Debug("Order by: Insert value into array", "value", tuple.Value, "array", ob.all)
 			insertionSort(&ob.all, tuple, "asc")
 			tuple, eot = ob.child.next()
-			ob.fetched = true
-			ob.it = NewIterator(&ob.all)
 		}
+		ob.fetched = true
+		ob.it = NewIterator(&ob.all)
 	}
+	slog.Debug("Fetched and ordered all tuples. Now iterate the tuples to the presenation layer.")
+	slog.Debug("Check iterator", "ob.it", ob.it, "ob.itval", ob.it.arr)
 	return ob.it.next()
 }
 
@@ -142,20 +150,23 @@ func ge[T dbtype](x [2]T) bool {
 	case []text:
 		return x[0] >= x[1]
 	default:
-		fmt.Printf("Unable to order type %T of value %v\n", x)
+		fmt.Printf("Unable to order type %T of value %v\n", x, x)
 		return false
 	}
 }
-func lt[T dbtype](x [2]T) bool {
+func lt[T dbtype](i [2]T) bool {
 	// having to do this switch is stupid. Probably skill issue
-	switch x := any(x).(type) {
-	case []smallint:
+	switch x := any(i).(type) {
+	case [2]smallint:
 		return x[0] < x[1]
-	case []tinyint:
+	case [2]tinyint:
 		return x[0] < x[1]
-	case []integer:
+	case [2]integer:
 		return x[0] < x[1]
-	case []text:
+	case [2]text:
+		return x[0] < x[1]
+	case [2]int:
+		fmt.Printf("NOT NATIVE DB TYPE")
 		return x[0] < x[1]
 	default:
 		fmt.Printf("Unable to order type %T of value %v\n", x, x)
