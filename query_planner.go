@@ -11,24 +11,50 @@ type Nextable interface {
 }
 
 type OrderBy struct {
-	child Nextable
+	child   Nextable
+	fetched bool
+	all     []Tuple
+	it      Iterator
 }
 
-func (ob OrderBy) result() []Tuple {
-	res := []Tuple{}
-	tuple, eot := ob.child.next()
-	res = append(res, tuple)
-	for !eot { // iterate for as long as there was no return and the table did not end
-		tuple, eot = ob.child.next()
-		res = append(res, tuple)
-	}
-	// look at: https://stackoverflow.com/questions/28999735/what-is-the-shortest-way-to-simply-sort-an-array-of-structs-by-arbitrary-field
-	// a:=res[0].Value
-	// sort.Slice(res, func(i, j dbtype) bool {
-	// 	return res[i].Value < res[j].Value
-	// })
+func insertAt(a *[]Tuple, index int, input Tuple) {
+	(*a) = append((*a)[:index+1], (*a)[index:]...)
+	(*a)[index] = input
+}
 
-	return res
+func insertionSort(a *[]Tuple, input Tuple, direction string) {
+	if len((*a)) == 0 {
+		(*a) = []Tuple{input}
+		return
+	}
+
+	com := [2]dbtype{}
+	for idx, _ := range *a {
+		com[0] = input.Value
+		com[1] = (*a)[idx].Value
+		if lt(com) {
+			insertAt(a, idx, input)
+			return
+		}
+	}
+}
+
+func (ob OrderBy) next() (Tuple, bool) {
+	if !ob.fetched {
+		tuple, eot := ob.child.next()
+		for !eot { // iterate for as long as there was no return and the table did not end
+			slog.Debug("Order by: Insert value into array", "value", tuple.Value, "array", ob.all)
+			insertionSort(&ob.all, tuple, "asc")
+			tuple, eot = ob.child.next()
+			ob.fetched = true
+			ob.it = NewIterator(&ob.all)
+		}
+	}
+	return ob.it.next()
+}
+
+func NewOrderBy(child Nextable) OrderBy {
+	return OrderBy{child: child, fetched: false, all: []Tuple{}, it: Iterator{}}
 }
 
 type Limit struct {
@@ -36,7 +62,7 @@ type Limit struct {
 	amount int
 }
 
-func (lim Limit) result() []Tuple {
+func (lim Limit) next() []Tuple {
 	res := []Tuple{}
 	if lim.amount <= 0 {
 		return res
@@ -116,7 +142,7 @@ func ge[T dbtype](x [2]T) bool {
 	case []text:
 		return x[0] >= x[1]
 	default:
-		fmt.Printf("Unable to order type %v\n", x)
+		fmt.Printf("Unable to order type %T of value %v\n", x)
 		return false
 	}
 }
@@ -132,7 +158,7 @@ func lt[T dbtype](x [2]T) bool {
 	case []text:
 		return x[0] < x[1]
 	default:
-		fmt.Printf("Unable to order type %v\n", x)
+		fmt.Printf("Unable to order type %T of value %v\n", x, x)
 		return false
 	}
 }

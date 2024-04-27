@@ -1,6 +1,9 @@
 package main
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"log/slog"
+)
 
 const PAGE_SIZE = uint16(4096)
 
@@ -56,9 +59,10 @@ func (p *Page) getTuplesByTuples(input []Tuple) []Tuple {
 	// Given an different set of Tuples give me all Tuples at the same index
 	// this is useful when a different column (e.i. page) is filtered and this
 	// page should return all rows that were filtered
-
+	slog.Debug("Get all tuples for page.", "Pageid", p.PageID)
 	output := []Tuple{}
 	for _, tup := range input {
+		slog.Debug("Get tuple for rowid", "rowid", tup.RowID, "allTuples", p.Tuples, "theTuple", p.Tuples[tup.RowID])
 		output = append(output, p.Tuples[tup.RowID])
 	}
 	return output

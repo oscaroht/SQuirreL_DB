@@ -19,18 +19,18 @@ func NewQueryError(m string) *QueryError {
 	return &QueryError{msg: m}
 }
 
-type result struct {
+type QueryResult struct {
 	sql     string
 	columns []string
 	table   [][]Tuple
 	message string // message to feed back to user for queries with no output e.g. 'Table created'
 }
 
-func NewResult(sql string, columns []string, table [][]Tuple, m string) *result {
-	return &result{sql: sql, columns: columns, table: table, message: m}
+func NewQueryResult(sql string, columns []string, table [][]Tuple, m string) *QueryResult {
+	return &QueryResult{sql: sql, columns: columns, table: table, message: m}
 }
 
-func execute_sql(sql string) ([]Tuple, error) {
+func execute_sql(sql string) (*QueryResult, error) {
 	stmt, err := sqlparser.Parse(sql)
 	if err != nil {
 		// fmt.Printf("Error parsing SQL: %s\n", err.Error())
@@ -128,7 +128,7 @@ func execute_sql(sql string) ([]Tuple, error) {
 
 					// create iterator
 					it = NewIterator(&p.Tuples) // This starts a sequencial scan of the rows
-					// var head Nextable = &it
+					head = &it
 				}
 				right := whereExpr.Right
 				switch right := right.(type) {
@@ -137,7 +137,7 @@ func execute_sql(sql string) ([]Tuple, error) {
 						//integer
 						slog.Debug("Filter with", "filer", sqlparser.String(right), "operand", string(right.Val))
 						i, _ := strconv.Atoi(string(right.Val))
-						filter = NewFilter(whereExpr.Operator, smallint(i), &it) // cast to a smallint now better would be to change everything to a []byte and implement compare functions based on a type iota
+						filter = NewFilter(whereExpr.Operator, smallint(i), head) // cast to a smallint now better would be to change everything to a []byte and implement compare functions based on a type iota
 						slog.Debug("Created filter.", "filter", filter)
 						head = &filter
 						// filter.child = &it
@@ -152,16 +152,24 @@ func execute_sql(sql string) ([]Tuple, error) {
 			it := NewIterator(&p.Tuples)                               // This starts a sequencial scan of the rows
 			head = &it
 		}
-		ans, eot := head.next()
-		var result []Tuple
-		for !eot {
-			slog.Debug("Rows emerged at presentation layer", "tuple", ans)
-			ans, eot = head.next()
-			result = append(result, ans)
+
+		if stmt.OrderBy != nil {
+			slog.Debug("order by in query", "stmt", stmt.OrderBy)
+			ob := NewOrderBy(head)
+			head = &ob
 		}
+
+		ans, eot := head.next()
+		result := []Tuple{}
+		for !eot {
+			slog.Debug("Row emerged at presentation layer", "tuple", ans)
+			result = append(result, ans)
+			ans, eot = head.next()
+		}
+		slog.Debug("All rows fetched.", "Rows", result)
 		// get all of the to be filtered column first sich that the page can be used a maximum number of times
 
-		// for every ans we should get all the columns.
+		// get all the columns the user requested.
 		// Do this per column such that every page can be used a maximum number of times before swapping
 		ret := [][]Tuple{}
 		for _, c := range presentationColumns {
@@ -169,23 +177,15 @@ func execute_sql(sql string) ([]Tuple, error) {
 			tuples := p.getTuplesByTuples(result)
 			ret = append(ret, tuples)
 		}
-		println("***********\n")
-		fmt.Printf("%v\n\n", sql)
-		// println("-----------------------------------------")
+
+		// in future presentationColumnNames will overwriten with the names of aliases. This is not implemented yet.
+		presentationColumnNames := []string{}
 		for _, col := range presentationColumns {
-			fmt.Printf("|%v", col.ColumnName)
+			presentationColumnNames = append(presentationColumnNames, col.ColumnName)
 		}
-		print("|\n")
-		// fmt.Printf("|%v|\n", cols[0].ColumnName)
-		println("-----------------------------------------")
-		for rowIdx := range len(ret[0]) {
-			for _, col := range ret {
-				fmt.Printf("| %v ", col[rowIdx].Value)
-			}
-			fmt.Printf("\n")
-		}
-		println("-----------------------------------------")
-		return result, nil
+
+		return NewQueryResult(sql, presentationColumnNames, ret, "fetched rows successfuly"), nil
+
 	case *sqlparser.DDL:
 		switch stmt.Action {
 		case "create":
@@ -200,8 +200,11 @@ func execute_sql(sql string) ([]Tuple, error) {
 			t := tm.CreateTable(tblName, cols)
 			bm.bufferNewTable(t)
 			slog.Debug("Created table.", "table name", t.TableName, "columns", t.Columns)
-
+			return NewQueryResult(sql, nil, nil, "Success"), nil
+		default:
+			return nil, &NotImplementedError{fmt.Sprintf("Unknow statement type: %T\n", stmt.Action)}
 		}
+
 	case *sqlparser.Insert:
 		switch stmt.Action {
 		case "insert":
@@ -230,6 +233,8 @@ func execute_sql(sql string) ([]Tuple, error) {
 				}
 			}
 
+			return NewQueryResult(sql, nil, nil, "Success"), nil
+
 			// cols := stmt.Columns // there are none
 			// insert into every page based on the order of the
 			// fmt.Printf("Inserted in table with name %v, rows %v\n", tblName, rows)
@@ -237,9 +242,11 @@ func execute_sql(sql string) ([]Tuple, error) {
 			// fmt.Printf("TM Table now looks like %v\n", tm.getTableByName(tblName))
 			// fmt.Printf("Page 0,1,2,3 now looks like %v, %v, %v, %v\n", bm.getPage(0).Tuples, bm.getPage(1).Tuples, bm.getPage(2).Tuples, bm.getPage(3).Tuples)
 
+		default:
+			return nil, &NotImplementedError{fmt.Sprintf("Unknow statement type: %T\n", stmt.Action)}
 		}
 	default:
 		return nil, &NotImplementedError{fmt.Sprintf("Unknow statement type: %T\n", stmt)}
 	}
-	return []Tuple{}, nil
+	return nil, &NotImplementedError{fmt.Sprintf("Unknow statement type: %T\n", stmt)}
 }

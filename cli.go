@@ -18,6 +18,29 @@ func completer(d prompt.Document) []prompt.Suggest {
 	return prompt.FilterHasPrefix(suggestions, d.GetWordBeforeCursor(), true)
 }
 
+func printFormattedResponse(result *QueryResult) {
+	println("*********************************************\n")
+	fmt.Printf("%v\n\n", result.sql)
+	// println("-----------------------------------------")
+	if result.table != nil && result.columns != nil {
+		for _, col := range result.columns {
+			fmt.Printf("|%v", col)
+		}
+		print("|\n")
+		// fmt.Printf("|%v|\n", cols[0].ColumnName)
+		println("-----------------------------------------")
+		for rowIdx := range len(result.table[0]) {
+			for _, col := range result.table {
+				fmt.Printf("| %v ", col[rowIdx].Value)
+			}
+			fmt.Printf("\n")
+		}
+	}
+	println("-----------------------------------------")
+	print("Message: ")
+	println(result.message)
+}
+
 func getExecutor(file string) func(string) {
 	return func(s string) {
 		s = strings.TrimSpace(s)
@@ -39,9 +62,11 @@ func getExecutor(file string) func(string) {
 			slog.SetLogLoggerLevel(slog.LevelWarn)
 			slog.Warn("Log level set to", "loglevel", 3)
 		default:
-			_, error := execute_sql(s)
+			result, error := execute_sql(s)
 			if error != nil {
 				slog.Error(error.Error())
+			} else {
+				printFormattedResponse(result)
 			}
 
 		}

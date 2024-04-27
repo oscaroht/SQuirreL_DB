@@ -32,6 +32,14 @@ func (t TableDescription) getColumnByName(name string) (Column, error) {
 	return Column{}, &TableError{"Column not found"}
 }
 
+func (t TableDescription) getColumnNames() []string {
+	columnNames := []string{}
+	for _, c := range t.Columns {
+		columnNames = append(columnNames, c.ColumnName)
+	}
+	return columnNames
+}
+
 type Column struct {
 	ColumnID   uint8 // every column has an ID. No more than 256columns allows
 	ColumnName string
