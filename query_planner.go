@@ -24,22 +24,23 @@ func insertAt(a *[]Tuple, index int, input Tuple) {
 
 func insertionSort(a *[]Tuple, input Tuple, direction string) {
 	if len((*a)) == 0 {
+		slog.Debug("The array is empty so insert it in the first slot.")
 		(*a) = []Tuple{input}
 		return
 	}
-
-	com := [2]dbtype{}
 	for idx, _ := range *a {
-		com[0] = input.Value
-		com[1] = (*a)[idx].Value
-		if lt(com) {
-			insertAt(a, idx, input)
+		slog.Debug("check how compares", "insertValue", input.Value, "value", (*a)[idx].Value)
+		if lt(input.Value, (*a)[idx].Value) {
+			slog.Debug("insert here before", "stop", (*a)[idx].Value)
+			insertAt(a, idx+1, input)
 			return
 		}
+		slog.Debug("insert here before", "stop", (*a)[idx].Value)
+		insertAt(a, idx, input)
 	}
 }
 
-func (ob OrderBy) next() (Tuple, bool) {
+func (ob *OrderBy) next() (Tuple, bool) {
 	// OrderBy: collect all tuples and insert them in order. Because next() returns 1 tuple at the time
 	// an iterator is needed to iterate through the sorted tuples. This iterator will push the tuples
 	// up to the next level.
@@ -58,7 +59,9 @@ func (ob OrderBy) next() (Tuple, bool) {
 	}
 	slog.Debug("Fetched and ordered all tuples. Now iterate the tuples to the presenation layer.")
 	slog.Debug("Check iterator", "ob.it", ob.it, "ob.itval", ob.it.arr)
-	return ob.it.next()
+	tup, eot2 := ob.it.next()
+	slog.Debug("End of table", "tuple", tup, "eot", eot2, "pointer", ob.it.pointer)
+	return tup, eot2
 }
 
 func NewOrderBy(child Nextable) OrderBy {
@@ -87,10 +90,10 @@ func (lim Limit) next() []Tuple {
 type Filter struct {
 	child      Nextable
 	filterFunc filfunc
-	operand    dbtype
+	operand    []byte
 }
 
-func eq[Q comparable](x [2]Q) bool {
+func eq(x []byte, y []byte) bool {
 	// fmt.Printf("Check if %v matches %v\n", x[0], x[1])
 	// switch x := any(x).(type) {
 	// case []smallint:
@@ -109,7 +112,7 @@ func eq[Q comparable](x [2]Q) bool {
 	slog.Debug("Evaluate == for.", "operand", x[0], "operand", x[1])
 	return x[0] == x[1]
 }
-func ne[Q comparable](x [2]Q) bool { // this means the function takes any 2 things as long as they are comaprable
+func ne(x []byte, y []byte) bool { // this means the function takes any 2 things as long as they are comaprable
 	return x[0] != x[1]
 }
 func gt[T dbtype](x [2]T) bool {
@@ -154,24 +157,34 @@ func ge[T dbtype](x [2]T) bool {
 		return false
 	}
 }
-func lt[T dbtype](i [2]T) bool {
-	// having to do this switch is stupid. Probably skill issue
-	switch x := any(i).(type) {
-	case [2]smallint:
-		return x[0] < x[1]
-	case [2]tinyint:
-		return x[0] < x[1]
-	case [2]integer:
-		return x[0] < x[1]
-	case [2]text:
-		return x[0] < x[1]
-	case [2]int:
-		fmt.Printf("NOT NATIVE DB TYPE")
-		return x[0] < x[1]
-	default:
-		fmt.Printf("Unable to order type %T of value %v\n", x, x)
-		return false
+
+// func lt[T dbtype](i [2]T) bool {
+// 	// having to do this switch is stupid. Probably skill issue
+// 	switch x := any(i).(type) {
+// 	case [2]smallint:
+// 		return x[0] < x[1]
+// 	case [2]tinyint:
+// 		return x[0] < x[1]
+// 	case [2]integer:
+// 		return x[0] < x[1]
+// 	case [2]text:
+// 		return x[0] < x[1]
+// 	case [2]int:
+// 		fmt.Printf("NOT NATIVE DB TYPE")
+// 		return x[0] < x[1]
+// 	default:
+// 		fmt.Printf("Unable to order type %T of value %v\n", x, x)
+// 		return false
+// 	}
+// }
+
+func lt(x []byte, y []byte) bool {
+	for i, b := range x {
+		if b > y[i] {
+			return false
+		}
 	}
+	return true
 }
 
 func le[T dbtype](x [2]T) bool {
@@ -191,7 +204,7 @@ func le[T dbtype](x [2]T) bool {
 	}
 }
 
-type filfunc func([2]dbtype) bool
+type filfunc func([]byte, []byte) bool
 
 func operatorSelection(operator string) filfunc {
 	// from string operator to operator function
@@ -200,21 +213,21 @@ func operatorSelection(operator string) filfunc {
 		return eq
 	case "!=":
 		return ne
-	case ">":
-		return gt
-	case ">=":
-		return ge
+	// case ">":
+	// 	return gt
+	// case ">=":
+	// 	return ge
 	case "<":
 		return lt
-	case "<=":
-		return le
+	// case "<=":
+	// 	return le
 	default:
 		fmt.Printf("No operator found")
 		return eq
 	}
 }
 
-func NewFilter(operator string, operand dbtype, child Nextable) Filter {
+func NewFilter(operator string, operand []byte, child Nextable) Filter {
 	fnc := operatorSelection(operator)
 	return Filter{operand: operand, filterFunc: fnc, child: child}
 }
@@ -224,8 +237,7 @@ func (f *Filter) next() (Tuple, bool) {
 	slog.Debug("Check filter", "tuple", tuple, "operand", f.operand, "eot", eot)
 	for !eot { // iterate for as long as there was no return and the table did not end
 		// rowVal := getField(tuple, eqfilter.filter.con.Operand1)
-		arr := [2]dbtype{tuple.Value, f.operand}
-		check := f.filterFunc(arr)
+		check := f.filterFunc(tuple.Value, f.operand)
 		if check {
 			slog.Debug("Condition satisfied. Return tuple")
 			return tuple, eot

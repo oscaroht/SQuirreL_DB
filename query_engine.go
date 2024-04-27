@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -137,7 +138,9 @@ func execute_sql(sql string) (*QueryResult, error) {
 						//integer
 						slog.Debug("Filter with", "filer", sqlparser.String(right), "operand", string(right.Val))
 						i, _ := strconv.Atoi(string(right.Val))
-						filter = NewFilter(whereExpr.Operator, integer(i), head) // cast to a smallint now better would be to change everything to a []byte and implement compare functions based on a type iota
+						p := make([]byte, 8)
+						binary.LittleEndian.AppendUint64(p, uint64(i))
+						filter = NewFilter(whereExpr.Operator, p, head) // cast to a smallint now better would be to change everything to a []byte and implement compare functions based on a type iota
 						slog.Debug("Created filter.", "filter", filter)
 						head = &filter
 						// filter.child = &it
@@ -159,12 +162,15 @@ func execute_sql(sql string) (*QueryResult, error) {
 			head = &ob
 		}
 
+		slog.Debug("Start iterating results", "head", head)
 		ans, eot := head.next()
+		slog.Debug("First row", "ans", ans, "eot", eot)
 		result := []Tuple{}
 		for !eot {
 			slog.Debug("Row emerged at presentation layer", "tuple", ans)
 			result = append(result, ans)
 			ans, eot = head.next()
+			slog.Debug("End?", "eot", eot)
 		}
 		slog.Debug("All rows fetched.", "Rows", result)
 		// get all of the to be filtered column first sich that the page can be used a maximum number of times

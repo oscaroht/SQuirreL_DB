@@ -13,27 +13,7 @@ const PAGE_SIZE = uint16(4096)
 
 type Tuple struct {
 	RowID uint32
-	Value dbtype
-}
-
-type SmallIntTuple struct {
-	RowID uint32
-	Value smallint
-}
-
-type TinyIntTuple struct {
-	RowID uint32
-	Value tinyint
-}
-
-type IntegerTuple struct {
-	RowID uint32
-	Value integer
-}
-
-type TextTuple struct {
-	RowID uint32
-	Value text
+	Value []byte
 }
 
 type Page struct {

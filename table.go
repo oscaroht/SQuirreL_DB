@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"strconv"
 
 	"golang.org/x/exp/slog"
@@ -86,16 +87,20 @@ func (tm *TableManager) insertIntoTable(t *TableDescription, colIdx int, rowid u
 	pageid := c.PageIDs[len(c.PageIDs)-1]
 	slog.Debug("", "Page id", pageid)
 	page := bm.getPage(pageid)
-	var tupleVal dbtype
+	// var tupleVal dbtype
+	var tupBytes []byte
 	switch typeint {
 	case 0:
-		tupleVal = text(val)
+		// tupleVal = text(val)
+		tupBytes = []byte(val)
 	case 1:
 		i, _ := strconv.Atoi(val)
-		tupleVal = smallint(i)
+		// tupleVal = smallint(i)
+		tupBytes = make([]byte, 8)
+		binary.LittleEndian.PutUint64(tupBytes, uint64(i))
 	}
 	slog.Debug("Create new tuple with", "type", typeint)
-	tup := Tuple{RowID: rowid, Value: tupleVal}
+	tup := Tuple{RowID: rowid, Value: tupBytes}
 	slog.Debug("Append tuple\n")
 	page.appendTuple(tup)
 

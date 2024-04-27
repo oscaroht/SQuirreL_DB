@@ -198,11 +198,8 @@ func main() {
 	fmt.Println(err)
 	printFormattedResponse(result)
 
-	a := smallint(1)
-	b := smallint(2)
-	c := [2]dbtype{a, b}
 	fmt.Print("test ")
-	fmt.Print(lt(c))
+	fmt.Print(lt([]byte{1}, []byte{2}))
 
 	// StartPromt("randomfile")
 }
