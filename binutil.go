@@ -33,7 +33,7 @@ func gt(x []byte, y []byte) bool {
 
 func ge(x []byte, y []byte) bool {
 	for i, _ := range x {
-		slog.Debug("Check if x<y", "x", x[i], "y", y[i])
+		slog.Debug("Check if x>y", "x", x[i], "y", y[i])
 		if x[i] > y[i] {
 			return true
 		}

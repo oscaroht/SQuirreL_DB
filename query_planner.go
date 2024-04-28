@@ -32,12 +32,12 @@ func insertionSort(a *[]Tuple, input Tuple, direction string) {
 		slog.Debug("check how compares", "insertValue", input.Value, "value", (*a)[idx].Value)
 		if lt(input.Value, (*a)[idx].Value) {
 			slog.Debug("insert here before", "stop", (*a)[idx].Value)
-			insertAt(a, idx+1, input)
+			insertAt(a, idx, input)
 			return
 		}
-		slog.Debug("insert here before", "stop", (*a)[idx].Value)
-		insertAt(a, idx, input)
 	}
+	slog.Debug("insert at the end")
+	*a = append(*a, input)
 }
 
 func (ob *OrderBy) next() (Tuple, bool) {
@@ -60,7 +60,7 @@ func (ob *OrderBy) next() (Tuple, bool) {
 	slog.Debug("Fetched and ordered all tuples. Now iterate the tuples to the presenation layer.")
 	slog.Debug("Check iterator", "ob.it", ob.it, "ob.itval", ob.it.arr)
 	tup, eot2 := ob.it.next()
-	slog.Debug("End of table", "tuple", tup, "eot", eot2, "pointer", ob.it.pointer)
+	// slog.Debug("End of table", "tuple", tup, "eot", eot2, "pointer", ob.it.pointer)
 	return tup, eot2
 }
 
@@ -89,27 +89,25 @@ func (lim Limit) next() []Tuple {
 
 type Filter struct {
 	child      Nextable
-	filterFunc filfunc
+	filterFunc binCompare
 	operand    []byte
 }
 
-type filfunc func([]byte, []byte) bool
-
-func operatorSelection(operator string) filfunc {
+func operatorSelection(operator string) binCompare {
 	// from string operator to operator function
 	switch operator {
 	case "=":
 		return eq
 	case "!=":
 		return ne
-	// case ">":
-	// 	return gt
-	// case ">=":
-	// 	return ge
+	case ">":
+		return gt
+	case ">=":
+		return ge
 	case "<":
 		return lt
-	// case "<=":
-	// 	return le
+	case "<=":
+		return le
 	default:
 		fmt.Printf("No operator found")
 		return eq

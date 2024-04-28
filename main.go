@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"log/slog"
 	"math/rand"
 	"time"
@@ -174,47 +173,5 @@ func main() {
 	bm = NewBufferManager()
 	tm = NewTableManager()
 
-	sql := "CREATE TABLE sensor (sensorid smallint, location text, ts int, temperature smallint);"
-	result, err := execute_sql(sql)
-	fmt.Println(err)
-	printFormattedResponse(result)
-	sql = "INSERT INTO sensor VALUES (1, 'Amsterdam', 1, 17);"
-	result, err = execute_sql(sql)
-	fmt.Println(err)
-	printFormattedResponse(result)
-
-	sql = "INSERT INTO sensor VALUES (1, 'Amsterdam', 3, 17);"
-	result, err = execute_sql(sql)
-	fmt.Println(err)
-	printFormattedResponse(result)
-
-	sql = "INSERT INTO sensor VALUES (1, 'Amsterdam', 2, 17);"
-	result, err = execute_sql(sql)
-	fmt.Println(err)
-	printFormattedResponse(result)
-
-	sql = "SELECT ts FROM sensor order by ts"
-	result, err = execute_sql(sql)
-	fmt.Println(err)
-	printFormattedResponse(result)
-
-	fmt.Print("test ")
-	a := make([]byte, 16)
-	binary.BigEndian.PutUint16(a, uint16(258))
-	b := make([]byte, 16)
-	binary.BigEndian.PutUint16(b, uint16(64))
-	fmt.Printf("Check if %v > %v\n", b, a)
-	fmt.Print(gt(a, b))
-	fmt.Println("\n*******************************************")
-
-	fmt.Print("test ")
-	c := []byte("hello")
-	// binary.BigEndian.PutUint16(a, uint16(258))
-	d := []byte("world hello world")
-	// binary.BigEndian.PutUint16(b, uint16(64))
-	fmt.Printf("Check if %v < %v\n", c, d)
-	fmt.Print(lt(c, d))
-	fmt.Println("\n*******************************************")
-
-	// StartPromt("randomfile")
+	StartPromt("randomfile")
 }
