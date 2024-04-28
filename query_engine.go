@@ -99,6 +99,9 @@ func execute_sql(sql string) (*QueryResult, error) {
 		if stmt.Limit != nil {
 			slog.Error("Limit not implemented")
 		}
+		if stmt.Having != nil {
+			slog.Error("Having not implemented")
+		}
 		filter := Filter{}
 		if stmt.Where != nil {
 			slog.Debug("", "Where type", stmt.Where.Type)
@@ -139,6 +142,9 @@ func execute_sql(sql string) (*QueryResult, error) {
 						slog.Debug("Filter with", "filer", sqlparser.String(right), "operand", string(right.Val))
 						i, _ := strconv.Atoi(string(right.Val))
 						p := make([]byte, 8)
+						if i < 0 {
+							return nil, &NotImplementedError{"Negative numbers not inplemented"}
+						}
 						binary.LittleEndian.AppendUint64(p, uint64(i))
 						filter = NewFilter(whereExpr.Operator, p, head) // cast to a smallint now better would be to change everything to a []byte and implement compare functions based on a type iota
 						slog.Debug("Created filter.", "filter", filter)

@@ -199,7 +199,22 @@ func main() {
 	printFormattedResponse(result)
 
 	fmt.Print("test ")
-	fmt.Print(lt([]byte{1}, []byte{2}))
+	a := make([]byte, 16)
+	binary.BigEndian.PutUint16(a, uint16(258))
+	b := make([]byte, 16)
+	binary.BigEndian.PutUint16(b, uint16(64))
+	fmt.Printf("Check if %v > %v\n", b, a)
+	fmt.Print(gt(a, b))
+	fmt.Println("\n*******************************************")
+
+	fmt.Print("test ")
+	c := []byte("hello")
+	// binary.BigEndian.PutUint16(a, uint16(258))
+	d := []byte("world hello world")
+	// binary.BigEndian.PutUint16(b, uint16(64))
+	fmt.Printf("Check if %v < %v\n", c, d)
+	fmt.Print(lt(c, d))
+	fmt.Println("\n*******************************************")
 
 	// StartPromt("randomfile")
 }
