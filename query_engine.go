@@ -23,11 +23,11 @@ func NewQueryError(m string) *QueryError {
 type QueryResult struct {
 	sql     string
 	columns []string
-	table   [][]Tuple
+	table   [][]dbtype
 	message string // message to feed back to user for queries with no output e.g. 'Table created'
 }
 
-func NewQueryResult(sql string, columns []string, table [][]Tuple, m string) *QueryResult {
+func NewQueryResult(sql string, columns []string, table [][]dbtype, m string) *QueryResult {
 	return &QueryResult{sql: sql, columns: columns, table: table, message: m}
 }
 
@@ -145,7 +145,7 @@ func execute_sql(sql string) (*QueryResult, error) {
 						if i < 0 {
 							return nil, &NotImplementedError{"Negative numbers not inplemented"}
 						}
-						binary.LittleEndian.AppendUint64(p, uint64(i))
+						binary.BigEndian.AppendUint64(p, uint64(i))
 						filter = NewFilter(whereExpr.Operator, p, head) // cast to a smallint now better would be to change everything to a []byte and implement compare functions based on a type iota
 						slog.Debug("Created filter.", "filter", filter)
 						head = &filter
@@ -183,10 +183,10 @@ func execute_sql(sql string) (*QueryResult, error) {
 
 		// get all the columns the user requested.
 		// Do this per column such that every page can be used a maximum number of times before swapping
-		ret := [][]Tuple{}
+		ret := [][]dbtype{}
 		for _, c := range presentationColumns {
 			p := bm.getPage(PageID(c.PageIDs[0]))
-			tuples := p.getTuplesByTuples(result)
+			tuples := p.getDBTypesByTuples(result)
 			ret = append(ret, tuples)
 		}
 

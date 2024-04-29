@@ -31,7 +31,7 @@ func printFormattedResponse(result *QueryResult) {
 		println("-----------------------------------------")
 		for rowIdx := range len(result.table[0]) {
 			for _, col := range result.table {
-				fmt.Printf("| %v ", col[rowIdx].Value)
+				fmt.Printf("| %v ", col[rowIdx])
 			}
 			fmt.Printf("\n")
 		}

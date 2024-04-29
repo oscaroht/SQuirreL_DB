@@ -16,23 +16,58 @@ type Tuple struct {
 	Value []byte
 }
 
+func (t *Tuple) tupleToValue(typ string) (dbtype, error) {
+	switch typ {
+	case "tinyint":
+		return tinyint(t.Value[0]), nil
+	case "smallint":
+		return smallint(binary.BigEndian.Uint16(t.Value)), nil
+	case "int":
+		return integer(binary.BigEndian.Uint32(t.Value)), nil
+	case "text":
+		return text(string(t.Value)), nil
+	default:
+		return integer(0), &NotImplementedError{"Tuple cannot be converted to dbtype"}
+	}
+}
+
 type Page struct {
-	Header    Header
-	PageID    PageID
-	LatestUse uint64 // time used to check which page is LRU by the buffer manager
-	SlotArray []Slot
-	Tuples    []Tuple   // maybe it is a better idea not to parse the entire content by let everything be decoded untill we actually need it
-	TypeSize  int8      // -1 for variable type
-	Capacity  uint16    // how many of this stuff still fits in here
-	Space     [2]uint16 // pointers to bytes in the page where new tulpes can be inserted.
-	isDirty   bool      // does this page contain changes? If so we need to write it to disk
-	pinCount  uint8     // by how many concurrent queries is this page used
+	Header          Header
+	PageID          PageID
+	PageContentType string
+	LatestUse       uint64 // time used to check which page is LRU by the buffer manager
+	SlotArray       []Slot
+	Tuples          []Tuple   // maybe it is a better idea not to parse the entire content by let everything be decoded untill we actually need it
+	TypeSize        int8      // -1 for variable type
+	Capacity        uint16    // how many of this stuff still fits in here
+	Space           [2]uint16 // pointers to bytes in the page where new tulpes can be inserted.
+	isDirty         bool      // does this page contain changes? If so we need to write it to disk
+	pinCount        uint8     // by how many concurrent queries is this page used
 }
 
 func deserializePage(b []byte) *Page {
 	// constructs the page structure from a bytes array.
 
 	return &Page{}
+}
+
+func (p *Page) getDBTypesByTuples(input []Tuple) []dbtype {
+	// Given an different set of Tuples give me all Tuples at the same index
+	// this is useful when a different column (e.i. page) is filtered and this
+	// page should return all rows that were filtered
+	slog.Debug("Get all tuples for page.", "Pageid", p.PageID)
+	output := []dbtype{}
+	var t dbtype
+	var err error
+	for _, tup := range input {
+		slog.Debug("Get tuple for rowid", "rowid", tup.RowID, "allTuples", p.Tuples, "theTuple", p.Tuples[tup.RowID])
+		t, err = p.Tuples[tup.RowID].tupleToValue(p.PageContentType)
+		if err != nil {
+			slog.Error("Conversion not possible for", "type", p.PageContentType, "err", err)
+		}
+		output = append(output, t)
+	}
+	return output
 }
 
 func (p *Page) getTuplesByTuples(input []Tuple) []Tuple {
@@ -51,7 +86,7 @@ func (p *Page) getTuplesByTuples(input []Tuple) []Tuple {
 func (p *Page) serialize() []byte {
 	b := []byte{}
 	b = append(b, p.Header.serialize()...)
-	binary.LittleEndian.PutUint64(b, uint64(p.LatestUse))
+	binary.BigEndian.PutUint64(b, uint64(p.LatestUse))
 	return b
 }
 
@@ -94,13 +129,13 @@ func deserializeHeader(b []byte) Header {
 func (h *Header) serialize() []byte {
 	b := []byte{}
 	b = append(b, h.HeaderLength)
-	// binary.LittleEndian.PutUint16(b, h.HeaderLength)
-	binary.LittleEndian.PutUint16(b[2:], h.PageID)
-	binary.LittleEndian.PutUint16(b[4:], h.TableID)
+	// binary.BigEndian.PutUint16(b, h.HeaderLength)
+	binary.BigEndian.PutUint16(b[2:], h.PageID)
+	binary.BigEndian.PutUint16(b[4:], h.TableID)
 	b = append(b, h.ColumnID)
 	b = append(b, h.PageContentType)
-	binary.LittleEndian.PutUint16(b[6:], h.PageOffset)
-	binary.LittleEndian.PutUint32(b[8:], h.SlotOffset)
+	binary.BigEndian.PutUint16(b[6:], h.PageOffset)
+	binary.BigEndian.PutUint32(b[8:], h.SlotOffset)
 	return b
 }
 
@@ -120,13 +155,13 @@ type SlotVarLength struct {
 
 func slotFromByteArray(arr []byte) Slot {
 	return Slot{
-		RowID:  binary.LittleEndian.Uint32(arr[0:]),
-		Offset: binary.LittleEndian.Uint16(arr[2:]),
+		RowID:  binary.BigEndian.Uint32(arr[0:]),
+		Offset: binary.BigEndian.Uint16(arr[2:]),
 	}
 }
 func (s Slot) toByteArray() []byte {
 	buffer := make([]byte, SLOT_SIZE)
-	binary.LittleEndian.PutUint32(buffer[0:], s.RowID)
-	binary.LittleEndian.PutUint16(buffer[4:], s.Offset)
+	binary.BigEndian.PutUint32(buffer[0:], s.RowID)
+	binary.BigEndian.PutUint16(buffer[4:], s.Offset)
 	return buffer
 }

@@ -18,6 +18,33 @@ func TestMain(t *testing.T) {
 	bm = NewBufferManager()
 	tm = NewTableManager()
 
+	tests := []struct {
+		sql  string
+		want QueryResult
+	}{
+		{sql: "CREATE TABLE sensor (sensorid int, location text, ts int, temperature smallint);", want: QueryResult{table: [][]dbtype{}}},
+		{sql: "INSERT INTO sensor VALUES (1, 'Amsterdam', 1, 17);", want: QueryResult{table: [][]dbtype{}}},
+		{sql: "INSERT INTO sensor VALUES (2, 'Rotterdam', 2, 17);", want: QueryResult{table: [][]dbtype{}}},
+		{sql: "INSERT INTO sensor VALUES (1, 'Amsterdam', 3, 18);", want: QueryResult{table: [][]dbtype{}}},
+		{sql: "SELECT sensorid FROM sensor", want: QueryResult{table: [][]dbtype{{integer(1), integer(2), integer(1)}}}},
+	}
+
+	var cell dbtype
+	for _, test := range tests {
+		result, err = execute_sql(test.sql)
+		if err != nil {
+			t.Fatalf("Error occured while execution. %v", err)
+		}
+		for r, _ := range result.table {
+			for c, _ := range result.table[0] {
+				cell = result.table[r][c]
+				if cell != test.want.table[r][c] {
+					t.Fatalf("Response %v not equal to %v", result.table, test.want.table)
+				}
+			}
+		}
+	}
+
 	sql = "CREATE TABLE sensor (sensorid smallint, location text, ts int, temperature smallint);"
 	result, err = execute_sql(sql)
 	fmt.Println(err)

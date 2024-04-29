@@ -96,8 +96,8 @@ func (tm *TableManager) insertIntoTable(t *TableDescription, colIdx int, rowid u
 	case 1:
 		i, _ := strconv.Atoi(val)
 		// tupleVal = smallint(i)
-		tupBytes = make([]byte, 8)
-		binary.LittleEndian.PutUint64(tupBytes, uint64(i))
+		tupBytes = make([]byte, 4)
+		binary.BigEndian.PutUint32(tupBytes, uint32(i))
 	}
 	slog.Debug("Create new tuple with", "type", typeint)
 	tup := Tuple{RowID: rowid, Value: tupBytes}

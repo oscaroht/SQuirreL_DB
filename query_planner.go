@@ -73,10 +73,10 @@ type Limit struct {
 	amount int
 }
 
-func (lim Limit) next() []Tuple {
+func (lim Limit) next() ([]Tuple, bool) {
 	res := []Tuple{}
 	if lim.amount <= 0 {
-		return res
+		return res, true
 	}
 	tuple, eot := lim.child.next()
 	res = append(res, tuple)
@@ -84,7 +84,7 @@ func (lim Limit) next() []Tuple {
 		tuple, eot = lim.child.next()
 		res = append(res, tuple)
 	}
-	return res
+	return res, true
 }
 
 type Filter struct {

@@ -89,7 +89,7 @@ func (bm *BufferManager) bufferNewTable(tab *TableDescription) {
 			typeSize = int8(64) // should have no max capacity not lets be easy for now
 		}
 
-		p := Page{Header: h, PageID: PageID(i), LatestUse: uint64(time.Now().UnixMilli()), TypeSize: typeSize}
+		p := Page{Header: h, PageID: PageID(i), LatestUse: uint64(time.Now().UnixMilli()), PageContentType: c.ColumnType, TypeSize: typeSize}
 		(*tab).Columns[i].PageIDs = append((*tab).Columns[i].PageIDs, p.PageID)
 		bm.addPage(&p)
 	}
