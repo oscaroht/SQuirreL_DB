@@ -11,10 +11,11 @@ type Nextable interface {
 }
 
 type OrderBy struct {
-	child   Nextable
-	fetched bool
-	all     []Tuple
-	it      Iterator
+	child     Nextable
+	fetched   bool
+	all       []Tuple
+	it        Iterator
+	direction string
 }
 
 func insertAt(a *[]Tuple, index int, input Tuple) {
@@ -44,6 +45,7 @@ func (ob *OrderBy) next() (Tuple, bool) {
 	// OrderBy: collect all tuples and insert them in order. Because next() returns 1 tuple at the time
 	// an iterator is needed to iterate through the sorted tuples. This iterator will push the tuples
 	// up to the next level.
+	// var iterator Nextable
 	if !ob.fetched {
 		tuple, eot := ob.child.next()
 		if eot {
@@ -55,7 +57,15 @@ func (ob *OrderBy) next() (Tuple, bool) {
 			tuple, eot = ob.child.next()
 		}
 		ob.fetched = true
-		ob.it = NewIterator(&ob.all)
+		switch ob.direction {
+		case "asc":
+			ob.it = NewIterator(&ob.all)
+		case "desc":
+			ob.it = NewReversedIterator(&ob.all)
+		default:
+			slog.Error("Unknows order bby direction", "direction", ob.it.direction)
+		}
+
 	}
 	slog.Debug("Fetched and ordered all tuples. Now iterate the tuples to the presenation layer.")
 	slog.Debug("Check iterator", "ob.it", ob.it, "ob.itval", ob.it.arr)
@@ -64,27 +74,32 @@ func (ob *OrderBy) next() (Tuple, bool) {
 	return tup, eot2
 }
 
-func NewOrderBy(child Nextable) OrderBy {
-	return OrderBy{child: child, fetched: false, all: []Tuple{}, it: Iterator{}}
+func NewOrderBy(child Nextable, dir string) OrderBy {
+	return OrderBy{child: child, fetched: false, all: []Tuple{}, it: Iterator{}, direction: dir}
 }
 
 type Limit struct {
-	child  Nextable
-	amount int
+	child   Nextable
+	amount  int
+	pointer int
 }
 
-func (lim Limit) next() ([]Tuple, bool) {
-	res := []Tuple{}
+func (lim *Limit) next() (Tuple, bool) {
+	tuple := Tuple{}
+	eot := false
 	if lim.amount <= 0 {
-		return res, true
+		return tuple, true
 	}
-	tuple, eot := lim.child.next()
-	res = append(res, tuple)
-	for !eot && len(res) < lim.amount { // iterate for as long as there was no return and the table did not end
+	if !eot && lim.pointer < lim.amount { // iterate for as long as there was no return and the table did not end
 		tuple, eot = lim.child.next()
-		res = append(res, tuple)
+		lim.pointer++
+		return tuple, false
 	}
-	return res, true
+	return tuple, true
+}
+
+func NewLimit(child Nextable, amount int) Limit {
+	return Limit{child: child, amount: amount, pointer: 0}
 }
 
 type Filter struct {
@@ -135,17 +150,18 @@ func (f *Filter) next() (Tuple, bool) {
 }
 
 type Iterator struct {
-	pointer int
-	arr     *[]Tuple
+	pointer   int
+	arr       *[]Tuple
+	direction int // 0 for 0->len, 1 for len->0
 }
 
 func NewIterator(arr *[]Tuple) Iterator {
-	return Iterator{pointer: 0, arr: arr}
+	return Iterator{pointer: 0, arr: arr, direction: 0}
 }
 
-// func (it *Iterator) AddQueryExecutionStep(qes *QueryExecutionStep){
-// 	it.step = *qes
-// }
+func NewReversedIterator(arr *[]Tuple) Iterator {
+	return Iterator{pointer: 0, arr: arr, direction: 1}
+}
 
 func (it *Iterator) next() (Tuple, bool) {
 	if it.pointer == len(*it.arr) {
@@ -154,5 +170,5 @@ func (it *Iterator) next() (Tuple, bool) {
 	}
 	it.pointer++
 	// fmt.Printf("Incremented iterator to %v\n", it.pointer)
-	return (*it.arr)[it.pointer-1], false
+	return (*it.arr)[it.direction*(len(*it.arr)-1)+(1-2*it.direction)*(it.pointer-1)], false
 }

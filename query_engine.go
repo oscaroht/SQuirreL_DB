@@ -96,9 +96,6 @@ func execute_sql(sql string) (*QueryResult, error) {
 			// fmt.Printf("Group clause: %v\n", sqlparser.String(stmt.GroupBy))
 		}
 
-		if stmt.Limit != nil {
-			slog.Error("Limit not implemented")
-		}
 		if stmt.Having != nil {
 			slog.Error("Having not implemented")
 		}
@@ -164,8 +161,24 @@ func execute_sql(sql string) (*QueryResult, error) {
 
 		if stmt.OrderBy != nil {
 			slog.Debug("order by in query", "stmt", stmt.OrderBy)
-			ob := NewOrderBy(head)
+			var dir string
+			// var columnName string
+			for _, j := range stmt.OrderBy {
+				// columnName = sqlparser.String(j.Expr)
+				dir = j.Direction
+			}
+			ob := NewOrderBy(head, dir)
 			head = &ob
+		}
+
+		if stmt.Limit != nil {
+			amount_str := sqlparser.String(stmt.Limit.Rowcount)
+			amount_int, err := strconv.Atoi(amount_str)
+			if err != nil {
+				slog.Error("Unable to read int from amount_str.", "amount", amount_str)
+			}
+			lim := NewLimit(head, amount_int)
+			head = &lim
 		}
 
 		slog.Debug("Start iterating results", "head", head)

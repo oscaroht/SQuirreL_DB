@@ -29,10 +29,15 @@ func TestMain(t *testing.T) {
 		{sql: "SELECT sensorid FROM sensor", want: QueryResult{table: [][]dbtype{{integer(1), integer(2), integer(1)}}}},
 		{sql: "SELECT sensorid FROM sensor ORDER BY sensorid", want: QueryResult{table: [][]dbtype{{integer(1), integer(1), integer(2)}}}},
 		{sql: "SELECT sensorid FROM sensor ORDER BY sensorid LIMIT 2", want: QueryResult{table: [][]dbtype{{integer(1), integer(1)}}}},
+		{sql: "SELECT location FROM sensor", want: QueryResult{table: [][]dbtype{{text("Amsterdam"), text("Rotterdam"), text("Amsterdam")}}}},
+		{sql: "SELECT location FROM sensor ORDER BY location ASC", want: QueryResult{table: [][]dbtype{{text("Amsterdam"), text("Amsterdam"), text("Rotterdam")}}}},
+		{sql: "SELECT location FROM sensor ORDER BY location DESC", want: QueryResult{table: [][]dbtype{{text("Rotterdam"), text("Amsterdam"), text("Amsterdam")}}}},
+		{sql: "SELECT temperature FROM sensor ORDER BY temperature DESC LIMIT 1", want: QueryResult{table: [][]dbtype{{smallint(18)}}}},
 	}
 
 	var cell dbtype
 	for _, test := range tests {
+		slog.Info(test.sql)
 		result, err = execute_sql(test.sql)
 		if err != nil {
 			t.Fatalf("Error occured while execution. %v", err)
@@ -41,7 +46,7 @@ func TestMain(t *testing.T) {
 			for c, _ := range result.table[0] {
 				cell = result.table[r][c]
 				if cell != test.want.table[r][c] {
-					t.Fatalf("Response %v not equal to %v", result.table, test.want.table)
+					t.Fatalf("Response for query %v: %v not equal to %v", test.sql, result.table, test.want.table)
 				}
 			}
 		}
