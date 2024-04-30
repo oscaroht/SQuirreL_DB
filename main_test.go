@@ -27,6 +27,8 @@ func TestMain(t *testing.T) {
 		{sql: "INSERT INTO sensor VALUES (2, 'Rotterdam', 2, 17);", want: QueryResult{table: [][]dbtype{}}},
 		{sql: "INSERT INTO sensor VALUES (1, 'Amsterdam', 3, 18);", want: QueryResult{table: [][]dbtype{}}},
 		{sql: "SELECT sensorid FROM sensor", want: QueryResult{table: [][]dbtype{{integer(1), integer(2), integer(1)}}}},
+		{sql: "SELECT sensorid FROM sensor ORDER BY sensorid", want: QueryResult{table: [][]dbtype{{integer(1), integer(1), integer(2)}}}},
+		{sql: "SELECT sensorid FROM sensor ORDER BY sensorid LIMIT 2", want: QueryResult{table: [][]dbtype{{integer(1), integer(1)}}}},
 	}
 
 	var cell dbtype

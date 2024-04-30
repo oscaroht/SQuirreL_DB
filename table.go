@@ -48,11 +48,6 @@ type Column struct {
 	PageIDs    []PageID
 }
 
-type DBType struct {
-	name      string
-	bitlength int // -1 for var length
-}
-
 type TableManager struct {
 	TableMap     map[string]*TableDescription // table name to table
 	tableIDCount uint16
@@ -95,9 +90,18 @@ func (tm *TableManager) insertIntoTable(t *TableDescription, colIdx int, rowid u
 		tupBytes = []byte(val)
 	case 1:
 		i, _ := strconv.Atoi(val)
-		// tupleVal = smallint(i)
-		tupBytes = make([]byte, 4)
-		binary.BigEndian.PutUint32(tupBytes, uint32(i))
+		switch c.ColumnType {
+		case "int":
+			tupBytes = make([]byte, 4)
+			binary.BigEndian.PutUint32(tupBytes, uint32(i))
+		case "smallint":
+			tupBytes = make([]byte, 2)
+			binary.BigEndian.PutUint16(tupBytes, uint16(i))
+		case "tinyint":
+			tupBytes = []byte{uint8(i)}
+		default:
+			slog.Error("Unrecognised type unable to cast to []byte{}.", "type", c.ColumnType)
+		}
 	}
 	slog.Debug("Create new tuple with", "type", typeint)
 	tup := Tuple{RowID: rowid, Value: tupBytes}
