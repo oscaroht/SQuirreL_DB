@@ -33,6 +33,14 @@ func TestMain(t *testing.T) {
 		{sql: "SELECT location FROM sensor ORDER BY location ASC", want: QueryResult{table: [][]dbtype{{text("Amsterdam"), text("Amsterdam"), text("Rotterdam")}}}},
 		{sql: "SELECT location FROM sensor ORDER BY location DESC", want: QueryResult{table: [][]dbtype{{text("Rotterdam"), text("Amsterdam"), text("Amsterdam")}}}},
 		{sql: "SELECT temperature FROM sensor ORDER BY temperature DESC LIMIT 1", want: QueryResult{table: [][]dbtype{{smallint(18)}}}},
+
+		{sql: "INSERT INTO sensor VALUES (4, 'London', 4, 15);", want: QueryResult{table: [][]dbtype{}}},
+		{sql: "INSERT INTO sensor VALUES (2, 'Rotterdam', 4, 20);", want: QueryResult{table: [][]dbtype{}}},
+		{sql: "INSERT INTO sensor VALUES (5, 'Paris', 5, 21);", want: QueryResult{table: [][]dbtype{}}},
+
+		{sql: "SELECT sensorid FROM sensor WHERE sensorid=1 ORDER BY location ASC", want: QueryResult{table: [][]dbtype{{integer(1), integer(1)}}}},
+		// {sql: "SELECT location FROM sensor ORDER BY location DESC", want: QueryResult{table: [][]dbtype{{text("Rotterdam"), text("Amsterdam"), text("Amsterdam")}}}},
+		// {sql: "SELECT temperature FROM sensor ORDER BY temperature DESC LIMIT 1", want: QueryResult{table: [][]dbtype{{smallint(18)}}}},
 	}
 
 	var cell dbtype
