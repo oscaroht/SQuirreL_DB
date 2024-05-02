@@ -34,9 +34,12 @@ func NewQueryResult(sql string, columns []string, table [][]dbtype, m string) *Q
 func where(whereExpr sqlparser.Expr, table *TableDescription, head Nextable) (Nextable, error) {
 	switch whereExpr := whereExpr.(type) {
 	case *sqlparser.AndExpr:
-		head, _ = where(whereExpr.Left, table, head)
-		head, _ = where(whereExpr.Right, table, head)
-		return nil, &NotImplementedError{"AndExpr not implemented"}
+		slog.Debug("And condition found", "left", whereExpr.Left, "right", whereExpr.Right)
+		step1, _ := where(whereExpr.Left, table, head)
+		head = step1
+		step2, _ := where(whereExpr.Right, table, head)
+		head = step2
+		return head, nil
 	case *sqlparser.ComparisonExpr:
 		left := whereExpr.Left
 		var it Iterator
@@ -62,15 +65,15 @@ func where(whereExpr sqlparser.Expr, table *TableDescription, head Nextable) (Ne
 				//integer
 				slog.Debug("Filter with", "filer", sqlparser.String(right), "operand", string(right.Val))
 				i, _ := strconv.Atoi(string(right.Val))
-				p := make([]byte, 8)
+				p := make([]byte, 4)
 				if i < 0 {
 					return nil, &NotImplementedError{"Negative numbers not inplemented"}
 				}
-				binary.BigEndian.AppendUint64(p, uint64(i))
+				binary.BigEndian.PutUint32(p, uint32(i))
 				filter := NewFilter(whereExpr.Operator, p, head) // cast to a smallint now better would be to change everything to a []byte and implement compare functions based on a type iota
 				slog.Debug("Created filter.", "filter", filter)
 				head = &filter
-				// filter.child = &it
+				return head, nil
 			}
 		default:
 			return nil, &NotImplementedError{fmt.Sprintf("Unknow statement type: %T\n", right)}
@@ -147,59 +150,61 @@ func execute_sql(sql string) (*QueryResult, error) {
 		if stmt.Having != nil {
 			slog.Error("Having not implemented")
 		}
-		filter := Filter{}
+		// filter := Filter{}
 		if stmt.Where != nil {
 			slog.Debug("", "Where type", stmt.Where.Type)
 
 			slog.Debug("", "Where clause", sqlparser.String(stmt.Where.Expr))
 			whereExpr := stmt.Where.Expr
 
-			switch whereExpr := whereExpr.(type) {
-			case *sqlparser.AndExpr:
-				head, err = where(whereExpr, table, head)
-				return nil, &NotImplementedError{"AndExpr not implemented"}
-			case *sqlparser.ComparisonExpr:
-				// fmt.Printf("%v\n", sqlparser.String(whereExpr.Left))
-				// fmt.Printf("%v\n", sqlparser.String(whereExpr.Right))
-				left := whereExpr.Left
-				// var head Nextable
-				var it Iterator
-				switch left := left.(type) {
-				case *sqlparser.ColName:
-					// c = left.Name
-					// fmt.Print(c)
-					col, error := table.getColumnByName(sqlparser.String(left.Name))
-					if error != nil {
-						return nil, &QueryError{fmt.Sprintf("Column %v does not exist", sqlparser.String(left.Name))}
-					}
-					p := bm.getPage(PageID(col.PageIDs[0])) // for now just take the first column from the where statement
-					// fmt.Printf("Page ID is %v with tuples: %v", p.PageID, p.Tuples)
+			head, err = where(whereExpr, table, head)
 
-					// create iterator
-					it = NewIterator(&p.Tuples) // This starts a sequencial scan of the rows
-					head = &it
-				}
-				right := whereExpr.Right
-				switch right := right.(type) {
-				case *sqlparser.SQLVal:
-					if right.Type == 1 { // this is a int
-						//integer
-						slog.Debug("Filter with", "filer", sqlparser.String(right), "operand", string(right.Val))
-						i, _ := strconv.Atoi(string(right.Val))
-						p := make([]byte, 8)
-						if i < 0 {
-							return nil, &NotImplementedError{"Negative numbers not inplemented"}
-						}
-						binary.BigEndian.AppendUint64(p, uint64(i))
-						filter = NewFilter(whereExpr.Operator, p, head) // cast to a smallint now better would be to change everything to a []byte and implement compare functions based on a type iota
-						slog.Debug("Created filter.", "filter", filter)
-						head = &filter
-						// filter.child = &it
-					}
-				default:
-					return nil, &NotImplementedError{fmt.Sprintf("Unknow statement type: %T\n", right)}
-				}
-			}
+			// switch whereExpr := whereExpr.(type) {
+			// case *sqlparser.AndExpr:
+			// 	head, err = where(whereExpr, table, head)
+			// 	return nil, &NotImplementedError{"AndExpr not implemented"}
+			// case *sqlparser.ComparisonExpr:
+			// 	// fmt.Printf("%v\n", sqlparser.String(whereExpr.Left))
+			// 	// fmt.Printf("%v\n", sqlparser.String(whereExpr.Right))
+			// 	left := whereExpr.Left
+			// 	// var head Nextable
+			// 	var it Iterator
+			// 	switch left := left.(type) {
+			// 	case *sqlparser.ColName:
+			// 		// c = left.Name
+			// 		// fmt.Print(c)
+			// 		col, error := table.getColumnByName(sqlparser.String(left.Name))
+			// 		if error != nil {
+			// 			return nil, &QueryError{fmt.Sprintf("Column %v does not exist", sqlparser.String(left.Name))}
+			// 		}
+			// 		p := bm.getPage(PageID(col.PageIDs[0])) // for now just take the first column from the where statement
+			// 		// fmt.Printf("Page ID is %v with tuples: %v", p.PageID, p.Tuples)
+
+			// 		// create iterator
+			// 		it = NewIterator(&p.Tuples) // This starts a sequencial scan of the rows
+			// 		head = &it
+			// 	}
+			// 	right := whereExpr.Right
+			// 	switch right := right.(type) {
+			// 	case *sqlparser.SQLVal:
+			// 		if right.Type == 1 { // this is a int
+			// 			//integer
+			// 			slog.Debug("Filter with", "filer", sqlparser.String(right), "operand", string(right.Val))
+			// 			i, _ := strconv.Atoi(string(right.Val))
+			// 			p := make([]byte, 8)
+			// 			if i < 0 {
+			// 				return nil, &NotImplementedError{"Negative numbers not inplemented"}
+			// 			}
+			// 			binary.BigEndian.AppendUint64(p, uint64(i))
+			// 			filter = NewFilter(whereExpr.Operator, p, head) // cast to a smallint now better would be to change everything to a []byte and implement compare functions based on a type iota
+			// 			slog.Debug("Created filter.", "filter", filter)
+			// 			head = &filter
+			// 			// filter.child = &it
+			// 		}
+			// 	default:
+			// 		return nil, &NotImplementedError{fmt.Sprintf("Unknow statement type: %T\n", right)}
+			// 	}
+			// }
 		} else {
 			// if there is no WHERE we can use any column to interate. So lets take the 0idx.
 			p := bm.getPage(PageID(presentationColumns[0].PageIDs[0])) // for now just take the first column from the where statement

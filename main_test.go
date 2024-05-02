@@ -39,12 +39,14 @@ func TestMain(t *testing.T) {
 		{sql: "INSERT INTO sensor VALUES (5, 'Paris', 5, 21);", want: QueryResult{table: [][]dbtype{}}},
 
 		{sql: "SELECT sensorid FROM sensor WHERE sensorid=1 ORDER BY location ASC", want: QueryResult{table: [][]dbtype{{integer(1), integer(1)}}}},
-		// {sql: "SELECT location FROM sensor ORDER BY location DESC", want: QueryResult{table: [][]dbtype{{text("Rotterdam"), text("Amsterdam"), text("Amsterdam")}}}},
-		// {sql: "SELECT temperature FROM sensor ORDER BY temperature DESC LIMIT 1", want: QueryResult{table: [][]dbtype{{smallint(18)}}}},
+
+		{sql: "SELECT location FROM sensor WHERE sensorid = 1 AND ts = 1", want: QueryResult{table: [][]dbtype{{text("Amsterdam")}}}},
+		{sql: "SELECT location FROM sensor WHERE temperature = 20 AND ts = 4", want: QueryResult{table: [][]dbtype{{text("Rotterdam")}}}},
 	}
 
 	var cell dbtype
 	for _, test := range tests {
+		slog.Info("-------------------------------------------------------------------------------------------------")
 		slog.Info(test.sql)
 		result, err = execute_sql(test.sql)
 		if err != nil {
