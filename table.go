@@ -48,6 +48,32 @@ type Column struct {
 	PageIDs    []PageID
 }
 
+func (column *Column) strToBytes(str string) ([]byte, error) {
+	switch column.ColumnType {
+	case "smallint":
+		i, _ := strconv.Atoi(string(str))
+		operand := make([]byte, 2)
+		if i < 0 {
+			return nil, &NotImplementedError{"Negative numbers not inplemented"}
+		}
+		binary.BigEndian.PutUint16(operand, uint16(i))
+		return operand, nil
+	case "int":
+		i, _ := strconv.Atoi(string(str))
+		operand := make([]byte, 4)
+		if i < 0 {
+			return nil, &NotImplementedError{"Negative numbers not inplemented"}
+		}
+		binary.BigEndian.PutUint32(operand, uint32(i))
+		return operand, nil
+	case "text":
+		return []byte(str), nil
+	default:
+		return nil, &NotImplementedError{"Input string cannot be casted to []byte"}
+	}
+
+}
+
 type TableManager struct {
 	TableMap     map[string]*TableDescription // table name to table
 	tableIDCount uint16

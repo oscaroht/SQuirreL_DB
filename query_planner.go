@@ -16,6 +16,7 @@ type OrderBy struct {
 	all       []Tuple
 	it        Iterator
 	direction string
+	column    Column
 }
 
 func insertAt(a *[]Tuple, index int, input Tuple) {
@@ -59,9 +60,9 @@ func (ob *OrderBy) next() (Tuple, bool) {
 		ob.fetched = true
 		switch ob.direction {
 		case "asc":
-			ob.it = NewIterator(&ob.all)
+			ob.it = NewIterator(ob.column, &ob.all)
 		case "desc":
-			ob.it = NewReversedIterator(&ob.all)
+			ob.it = NewReversedIterator(ob.column, &ob.all)
 		default:
 			slog.Error("Unknows order bby direction", "direction", ob.it.direction)
 		}
@@ -74,8 +75,8 @@ func (ob *OrderBy) next() (Tuple, bool) {
 	return tup, eot2
 }
 
-func NewOrderBy(child Nextable, dir string) OrderBy {
-	return OrderBy{child: child, fetched: false, all: []Tuple{}, it: Iterator{}, direction: dir}
+func NewOrderBy(column Column, child Nextable, dir string) OrderBy {
+	return OrderBy{column: column, child: child, fetched: false, all: []Tuple{}, it: Iterator{}, direction: dir}
 }
 
 type Limit struct {
@@ -104,6 +105,7 @@ func NewLimit(child Nextable, amount int) Limit {
 
 type Filter struct {
 	child      Nextable
+	page       *Page
 	filterFunc binCompare
 	operand    []byte
 }
@@ -129,9 +131,9 @@ func operatorSelection(operator string) binCompare {
 	}
 }
 
-func NewFilter(operator string, operand []byte, child Nextable) Filter {
+func NewFilter(operator string, operand []byte, page *Page, child Nextable) Filter {
 	fnc := operatorSelection(operator)
-	return Filter{operand: operand, filterFunc: fnc, child: child}
+	return Filter{operand: operand, filterFunc: fnc, page: page, child: child}
 }
 
 func (f *Filter) next() (Tuple, bool) {
@@ -139,7 +141,10 @@ func (f *Filter) next() (Tuple, bool) {
 	slog.Debug("Check filter", "tuple", tuple, "operand", f.operand, "eot", eot)
 	for !eot { // iterate for as long as there was no return and the table did not end
 		// rowVal := getField(tuple, eqfilter.filter.con.Operand1)
-		check := f.filterFunc(tuple.Value, f.operand)
+
+		newTup := f.page.getTuple(tuple.RowID)
+
+		check := f.filterFunc(newTup.Value, f.operand)
 		if check {
 			slog.Debug("Condition satisfied. Return tuple")
 			return tuple, eot
@@ -150,23 +155,24 @@ func (f *Filter) next() (Tuple, bool) {
 }
 
 type Iterator struct {
+	column    Column
 	pointer   int
 	arr       *[]Tuple
 	direction int // 0 for 0->len, 1 for len->0
 }
 
-func NewIterator(arr *[]Tuple) Iterator {
-	return Iterator{pointer: 0, arr: arr, direction: 0}
+func NewIterator(column Column, arr *[]Tuple) Iterator {
+	return Iterator{column: column, pointer: 0, arr: arr, direction: 0}
 }
 
-func NewReversedIterator(arr *[]Tuple) Iterator {
-	return Iterator{pointer: 0, arr: arr, direction: 1}
+func NewReversedIterator(column Column, arr *[]Tuple) Iterator {
+	return Iterator{column: column, pointer: 0, arr: arr, direction: 1}
 }
 
 func (it *Iterator) next() (Tuple, bool) {
 	if it.pointer == len(*it.arr) {
 		// fmt.Println("EOT")
-		return (*it.arr)[0], true
+		return (*it.arr)[0], true // not allowed to return nil
 	}
 	it.pointer++
 	// fmt.Printf("Incremented iterator to %v\n", it.pointer)

@@ -247,5 +247,5 @@ func main() {
 	// fmt.Println(err)
 	// printFormattedResponse(result)
 
-	StartPromt("randomfile")
+	// StartPromt("randomfile")
 }

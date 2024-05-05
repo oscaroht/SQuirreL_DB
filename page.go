@@ -51,6 +51,10 @@ func deserializePage(b []byte) *Page {
 	return &Page{}
 }
 
+func (p *Page) getTuple(rowid uint32) Tuple {
+	return p.Tuples[rowid]
+}
+
 func (p *Page) getDBTypesByTuples(input []Tuple) []dbtype {
 	// Given an different set of Tuples give me all Tuples at the same index
 	// this is useful when a different column (e.i. page) is filtered and this

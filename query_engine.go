@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/binary"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -42,21 +41,29 @@ func where(whereExpr sqlparser.Expr, table *TableDescription, head Nextable) (Ne
 		return head, nil
 	case *sqlparser.ComparisonExpr:
 		left := whereExpr.Left
+		var col Column
+		var error any
+		var p *Page
 		var it Iterator
 		switch left := left.(type) {
 		case *sqlparser.ColName:
 			// c = left.Name
 			// fmt.Print(c)
-			col, error := table.getColumnByName(sqlparser.String(left.Name))
+			col, error = table.getColumnByName(sqlparser.String(left.Name))
 			if error != nil {
 				return nil, &QueryError{fmt.Sprintf("Column %v does not exist", sqlparser.String(left.Name))}
 			}
-			p := bm.getPage(PageID(col.PageIDs[0])) // for now just take the first column from the where statement
-			// fmt.Printf("Page ID is %v with tuples: %v", p.PageID, p.Tuples)
+			p = bm.getPage(PageID(col.PageIDs[0])) // for now just take the first page
 
-			// create iterator
-			it = NewIterator(&p.Tuples) // This starts a sequencial scan of the rows
-			head = &it
+			if head == nil {
+				// create iterator
+				slog.Debug("Head in empty so create new iterator")
+				it = NewIterator(col, &p.Tuples) // This starts a sequencial scan of the rows
+				head = &it
+			}
+
+		default:
+			return nil, &QueryError{"left side not a column name"}
 		}
 		right := whereExpr.Right
 		switch right := right.(type) {
@@ -64,13 +71,13 @@ func where(whereExpr sqlparser.Expr, table *TableDescription, head Nextable) (Ne
 			if right.Type == 1 { // this is a int
 				//integer
 				slog.Debug("Filter with", "filer", sqlparser.String(right), "operand", string(right.Val))
-				i, _ := strconv.Atoi(string(right.Val))
-				p := make([]byte, 4)
-				if i < 0 {
-					return nil, &NotImplementedError{"Negative numbers not inplemented"}
+				operand, error := col.strToBytes(string(right.Val))
+				if error != nil {
+					return nil, &QueryError{"Cannot cast one of the values in a where clause."}
 				}
-				binary.BigEndian.PutUint32(p, uint32(i))
-				filter := NewFilter(whereExpr.Operator, p, head) // cast to a smallint now better would be to change everything to a []byte and implement compare functions based on a type iota
+				// binary.BigEndian.PutUint32(operand, uint32(i))
+				// slog.Debug("Cast and convert input str (can be int) to bytes", "str", i, "operand", operand)
+				filter := NewFilter(whereExpr.Operator, operand, p, head) // cast to a smallint now better would be to change everything to a []byte and implement compare functions based on a type iota
 				slog.Debug("Created filter.", "filter", filter)
 				head = &filter
 				return head, nil
@@ -208,19 +215,24 @@ func execute_sql(sql string) (*QueryResult, error) {
 		} else {
 			// if there is no WHERE we can use any column to interate. So lets take the 0idx.
 			p := bm.getPage(PageID(presentationColumns[0].PageIDs[0])) // for now just take the first column from the where statement
-			it := NewIterator(&p.Tuples)                               // This starts a sequencial scan of the rows
+			it := NewIterator(presentationColumns[0], &p.Tuples)       // This starts a sequencial scan of the rows
 			head = &it
 		}
 
 		if stmt.OrderBy != nil {
 			slog.Debug("order by in query", "stmt", stmt.OrderBy)
 			var dir string
-			// var columnName string
+			var columnName string
 			for _, j := range stmt.OrderBy {
-				// columnName = sqlparser.String(j.Expr)
+				columnName = sqlparser.String(j.Expr)
 				dir = j.Direction
 			}
-			ob := NewOrderBy(head, dir)
+			c, err := table.getColumnByName(columnName)
+			if err != nil {
+				slog.Error(err.Error())
+				return nil, &QueryError{"Column name not found"}
+			}
+			ob := NewOrderBy(c, head, dir)
 			head = &ob
 		}
 
