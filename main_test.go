@@ -41,6 +41,11 @@ func TestMain(t *testing.T) {
 
 		{sql: "SELECT location FROM sensor WHERE sensorid = 1 AND ts = 1", want: QueryResult{table: [][]dbtype{{text("Amsterdam")}}}},
 		{sql: "SELECT location FROM sensor WHERE temperature = 20 AND ts = 4", want: QueryResult{table: [][]dbtype{{text("Rotterdam")}}}},
+
+		{sql: "SELECT DISTINCT location FROM sensor WHERE temperature = 17", want: QueryResult{table: [][]dbtype{{text("Amsterdam"), text("Rotterdam")}}}},
+		{sql: "SELECT DISTINCT sensorid, location FROM sensor WHERE temperature = 17", want: QueryResult{table: [][]dbtype{{integer(1), integer(2)}, {text("Amsterdam"), text("Rotterdam")}}}},
+		{sql: "SELECT DISTINCT sensorid, location, temperature FROM sensor WHERE sensorid = 1", want: QueryResult{table: [][]dbtype{{integer(1), integer(1)}, {text("Amsterdam"), text("Amsterdam")}, {smallint(17), smallint(18)}}}},
+		{sql: "SELECT DISTINCT sensorid, location, temperature FROM sensor WHERE location = 'Amsterdam'", want: QueryResult{table: [][]dbtype{{integer(1), integer(1)}, {text("Amsterdam"), text("Amsterdam")}, {smallint(17), smallint(18)}}}},
 	}
 
 	var cell dbtype

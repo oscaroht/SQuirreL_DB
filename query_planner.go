@@ -10,6 +10,41 @@ type Nextable interface {
 	next() (Tuple, bool)
 }
 
+type Distinct struct {
+	// Check if the value of an incomming tuples is in a set. If so get the next tuple. If not yet in the set, put it in the set, and return the tuple.
+	child   Nextable
+	columns []Column
+	set     map[string]uint8 // byte slice is not hashable. However, string is just byte slice so let's use that!
+}
+
+func NewDistinct(child Nextable, columns []Column) Distinct {
+	return Distinct{child, columns, make(map[string]uint8)}
+}
+
+func (d *Distinct) next() (Tuple, bool) {
+	slog.Debug("Call next on disitnct child")
+	tup, eot := d.child.next()
+
+	bytes := []byte{}
+	for _, c := range d.columns {
+		val, err := c.getTupleByRowID(tup.RowID)
+		if err != nil {
+			slog.Error(err.Error())
+		}
+		bytes = append(bytes, val.Value...)
+	}
+
+	for !eot {
+		_, ok := d.set[string(bytes)]
+		if !ok {
+			d.set[string(bytes)] = 1 // I am not interested in the value so I just put uint8(1). I cannot find which type consumes the least amount of mem. Maybe it is bool?? Dunno.
+			return tup, eot
+		}
+		tup, eot = d.child.next()
+	}
+	return tup, eot
+}
+
 type OrderBy struct {
 	child     Nextable
 	fetched   bool

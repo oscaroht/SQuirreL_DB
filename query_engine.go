@@ -57,9 +57,10 @@ func where(whereExpr sqlparser.Expr, table *TableDescription, head Nextable) (Ne
 
 			if head == nil {
 				// create iterator
-				slog.Debug("Head in empty so create new iterator")
+				slog.Debug("Head is empty so create new iterator")
 				it = NewIterator(col, &p.Tuples) // This starts a sequencial scan of the rows
 				head = &it
+				slog.Debug("", "head", head)
 			}
 
 		default:
@@ -118,7 +119,7 @@ func execute_sql(sql string) (*QueryResult, error) {
 				case *sqlparser.ColName:
 					col, error := (*table).getColumnByName(sqlparser.String(cas.Name))
 					if error != nil {
-						return nil, &QueryError{"Column does not exist"}
+						return nil, &QueryError{fmt.Sprintf("Column %v does not exist\n", sqlparser.String(cas.Name))}
 					}
 					presentationColumns = append(presentationColumns, col)
 					// fmt.Printf("Alias Expr not implemented.\n")
@@ -147,10 +148,6 @@ func execute_sql(sql string) (*QueryResult, error) {
 			// for _, n := range stmt.GroupBy {
 			// 	fmt.Printf("%v\n", sqlparser.String(n))
 			// }
-			// fmt.Printf("Group clause: %v\n", sqlparser.String(stmt.GroupBy))
-		}
-		if stmt.Distinct != "" {
-			return nil, &NotImplementedError{"Distinct not implemented"}
 			// fmt.Printf("Group clause: %v\n", sqlparser.String(stmt.GroupBy))
 		}
 
@@ -217,6 +214,12 @@ func execute_sql(sql string) (*QueryResult, error) {
 			p := bm.getPage(PageID(presentationColumns[0].PageIDs[0])) // for now just take the first column from the where statement
 			it := NewIterator(presentationColumns[0], &p.Tuples)       // This starts a sequencial scan of the rows
 			head = &it
+		}
+		if stmt.Distinct != "" {
+			d := NewDistinct(head, presentationColumns)
+			head = &d
+			// return nil, &NotImplementedError{"Distinct not implemented"}
+			// fmt.Printf("Group clause: %v\n", sqlparser.String(stmt.GroupBy))
 		}
 
 		if stmt.OrderBy != nil {

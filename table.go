@@ -48,6 +48,15 @@ type Column struct {
 	PageIDs    []PageID
 }
 
+func (column *Column) getTupleByRowID(rowid uint32) (Tuple, error) {
+	p := bm.getPage(column.PageIDs[0])
+	// if err != nil{
+	// 	slog.Error(err.Error())
+	// 	return Tuple{}, err
+	// }
+	return p.Tuples[rowid], nil
+}
+
 func (column *Column) strToBytes(str string) ([]byte, error) {
 	switch column.ColumnType {
 	case "smallint":
