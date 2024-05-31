@@ -69,20 +69,20 @@ func where(whereExpr sqlparser.Expr, table *TableDescription, head Nextable) (Ne
 		right := whereExpr.Right
 		switch right := right.(type) {
 		case *sqlparser.SQLVal:
-			if right.Type == 1 { // this is a int
-				//integer
-				slog.Debug("Filter with", "filer", sqlparser.String(right), "operand", string(right.Val))
-				operand, error := col.strToBytes(string(right.Val))
-				if error != nil {
-					return nil, &QueryError{"Cannot cast one of the values in a where clause."}
-				}
-				// binary.BigEndian.PutUint32(operand, uint32(i))
-				// slog.Debug("Cast and convert input str (can be int) to bytes", "str", i, "operand", operand)
-				filter := NewFilter(whereExpr.Operator, operand, p, head) // cast to a smallint now better would be to change everything to a []byte and implement compare functions based on a type iota
-				slog.Debug("Created filter.", "filter", filter)
-				head = &filter
-				return head, nil
+			// if right.Type == 1 { // this is a int
+			//integer
+			slog.Debug("Filter with", "filer", sqlparser.String(right), "operand", string(right.Val))
+			operand, error := col.strToBytes(string(right.Val))
+			if error != nil {
+				return nil, &QueryError{"Cannot cast one of the values in a where clause."}
 			}
+			// binary.BigEndian.PutUint32(operand, uint32(i))
+			// slog.Debug("Cast and convert input str (can be int) to bytes", "str", i, "operand", operand)
+			filter := NewFilter(whereExpr.Operator, operand, p, head) // cast to a smallint now better would be to change everything to a []byte and implement compare functions based on a type iota
+			slog.Debug("Created filter.", "filter", filter)
+			head = &filter
+			return head, nil
+			// }
 		default:
 			return nil, &NotImplementedError{fmt.Sprintf("Unknow statement type: %T\n", right)}
 		}
@@ -162,6 +162,9 @@ func execute_sql(sql string) (*QueryResult, error) {
 			whereExpr := stmt.Where.Expr
 
 			head, err = where(whereExpr, table, head)
+			if err != nil {
+				slog.Error("Error while parsing where statement", "Error", err)
+			}
 
 			// switch whereExpr := whereExpr.(type) {
 			// case *sqlparser.AndExpr:
@@ -219,6 +222,7 @@ func execute_sql(sql string) (*QueryResult, error) {
 			d := NewDistinct(head, presentationColumns)
 			head = &d
 			// return nil, &NotImplementedError{"Distinct not implemented"}
+			slog.Debug("distinct", "head", head)
 			// fmt.Printf("Group clause: %v\n", sqlparser.String(stmt.GroupBy))
 		}
 

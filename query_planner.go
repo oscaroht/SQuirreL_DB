@@ -22,22 +22,23 @@ func NewDistinct(child Nextable, columns []Column) Distinct {
 }
 
 func (d *Distinct) next() (Tuple, bool) {
-	slog.Debug("Call next on disitnct child")
+	slog.Debug("Call next on distinct child")
 	tup, eot := d.child.next()
 
-	bytes := []byte{}
-	for _, c := range d.columns {
-		val, err := c.getTupleByRowID(tup.RowID)
-		if err != nil {
-			slog.Error(err.Error())
-		}
-		bytes = append(bytes, val.Value...)
-	}
-
 	for !eot {
+		// Get all cells and put them in a byte array
+		bytes := []byte{}
+		for _, c := range d.columns {
+			val, err := c.getTupleByRowID(tup.RowID)
+			if err != nil {
+				slog.Error(err.Error())
+			}
+			bytes = append(bytes, val.Value...)
+		}
+		// If byte array is not yet in the hash set return it. Otherwise continue.
 		_, ok := d.set[string(bytes)]
 		if !ok {
-			d.set[string(bytes)] = 1 // I am not interested in the value so I just put uint8(1). I cannot find which type consumes the least amount of mem. Maybe it is bool?? Dunno.
+			d.set[string(bytes)] = 1 // Not interested in the value (only the key) so I just put value=1. I cannot find which type consumes the least amount of mem. Maybe it is bool?? Dunno.
 			return tup, eot
 		}
 		tup, eot = d.child.next()
