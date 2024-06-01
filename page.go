@@ -7,9 +7,7 @@ import (
 
 const PAGE_SIZE = uint16(4096)
 
-// type Tuple interface{
-// getVal()
-// }
+type semanticVersion [3]uint8
 
 type Tuple struct {
 	RowID uint32
@@ -32,17 +30,24 @@ func (t *Tuple) tupleToValue(typ string) (dbtype, error) {
 }
 
 type Page struct {
-	Header          Header
+	BinaryEncodingVersion semanticVersion // version of the encoding. Depending on the version the (de)serialization changes.
+	HeaderLength          uint8           // length of this header
+	PageOffset            uint16          // bytes offset where in the db file does this page start // the type depends on the PAGE_SIZE
+	SlotOffset            uint32          // where does the slotarray start
+
 	PageID          PageID
+	TableID         TableID
+	ColumnID        ColumnID
 	PageContentType string
-	LatestUse       uint64 // time used to check which page is LRU by the buffer manager
-	SlotArray       []Slot
-	Tuples          []Tuple   // maybe it is a better idea not to parse the entire content by let everything be decoded untill we actually need it
+	LatestUse       uint64    // time used to check which page is LRU by the buffer manager
 	TypeSize        int8      // -1 for variable type
 	Capacity        uint16    // how many of this stuff still fits in here
 	Space           [2]uint16 // pointers to bytes in the page where new tulpes can be inserted.
 	isDirty         bool      // does this page contain changes? If so we need to write it to disk
 	pinCount        uint8     // by how many concurrent queries is this page used
+
+	SlotArray []Slot
+	Tuples    []Tuple // maybe it is a better idea not to parse the entire content by let everything be decoded untill we actually need it
 }
 
 func deserializePage(b []byte) *Page {
@@ -89,8 +94,8 @@ func (p *Page) getTuplesByTuples(input []Tuple) []Tuple {
 
 func (p *Page) serialize() []byte {
 	b := []byte{}
-	b = append(b, p.Header.serialize()...)
-	binary.BigEndian.PutUint64(b, uint64(p.LatestUse))
+	// b = append(b, p.Header.serialize()...)
+	// binary.BigEndian.PutUint64(b, uint64(p.LatestUse))
 	return b
 }
 

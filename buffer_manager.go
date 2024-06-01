@@ -76,7 +76,7 @@ func (b BufferManager) getLeastRecentlyUsed() *Page {
 func (bm *BufferManager) bufferNewTable(tab *TableDescription) {
 
 	for i, c := range tab.Columns {
-		h := Header{HeaderLength: HEADER_SIZE, PageID: uint16(i), TableID: uint16(1)}
+		// h := Header{HeaderLength: HEADER_SIZE, PageID: uint16(i), TableID: uint16(1)}
 		var typeSize int8
 		switch c.ColumnType { // maybe better to store this somewhere instead of a random switch here
 		case "tinyint":
@@ -89,7 +89,7 @@ func (bm *BufferManager) bufferNewTable(tab *TableDescription) {
 			typeSize = int8(64) // should have no max capacity not lets be easy for now
 		}
 
-		p := Page{Header: h, PageID: PageID(i), LatestUse: uint64(time.Now().UnixMilli()), PageContentType: c.ColumnType, TypeSize: typeSize}
+		p := Page{HeaderLength: HEADER_SIZE, PageID: PageID(i), TableID: TableID(1), LatestUse: uint64(time.Now().UnixMilli()), PageContentType: c.ColumnType, TypeSize: typeSize}
 		(*tab).Columns[i].PageIDs = append((*tab).Columns[i].PageIDs, p.PageID)
 		bm.addPage(&p)
 	}
