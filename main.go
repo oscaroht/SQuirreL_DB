@@ -54,6 +54,19 @@ var tm *TableManager
 // 	return x.toBin()
 // }
 
+type storeType int
+
+const (
+	integerType storeType = iota
+	smallintType
+	tinyintType
+	textType
+)
+
+func (d storeType) String() string {
+	return [...]string{"int", "smallint", "tinyint", "text"}[d]
+}
+
 type dbtype interface {
 	toBin() []byte
 	binLen() int16

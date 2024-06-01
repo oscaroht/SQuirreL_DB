@@ -3,11 +3,30 @@ package main
 import (
 	"encoding/binary"
 	"log/slog"
+	"time"
 )
 
 const PAGE_SIZE = uint16(4096)
+const HEADER_SIZE = uint8(34)
+const ROWIDSIZE = uint8(4) // 4byte
+
+var VERSION = NewVersion(uint8(0), uint8(0), uint8(0))
 
 type semanticVersion [3]uint8
+
+func NewVersion(a uint8, b uint8, c uint8) semanticVersion {
+	return [3]uint8{a, b, c}
+}
+
+func (s *semanticVersion) serialize() []byte {
+	b := []byte{}
+	b = append(b, s[0], s[1], s[2]) // s is an array with length 3 of uint8. uint8 is a byte so just append.
+	return b
+}
+
+func deserializeSemanticVersion(b []byte) semanticVersion {
+	return [3]uint8{b[0], b[1], b[2]}
+}
 
 type Tuple struct {
 	RowID uint32
@@ -40,7 +59,7 @@ type Page struct {
 	ColumnID        ColumnID
 	PageContentType string
 	LatestUse       uint64    // time used to check which page is LRU by the buffer manager
-	TypeSize        int8      // -1 for variable type
+	TypeSize        uint8     // 0 for variable type
 	Capacity        uint16    // how many of this stuff still fits in here
 	Space           [2]uint16 // pointers to bytes in the page where new tulpes can be inserted.
 	isDirty         bool      // does this page contain changes? If so we need to write it to disk
@@ -48,6 +67,29 @@ type Page struct {
 
 	SlotArray []Slot
 	Tuples    []Tuple // maybe it is a better idea not to parse the entire content by let everything be decoded untill we actually need it
+}
+
+func NewPage(pid PageID, tid TableID, pctype string, ts uint8) Page {
+	p := Page{BinaryEncodingVersion: VERSION,
+		HeaderLength:    HEADER_SIZE,
+		PageID:          pid,
+		TableID:         tid,
+		LatestUse:       uint64(time.Now().UnixMilli()),
+		PageContentType: pctype,
+		TypeSize:        ts,
+
+		Capacity:  0,
+		Space:     [2]uint16{uint16(0), uint16(0)},
+		isDirty:   true,
+		pinCount:  0,
+		SlotArray: []Slot{},
+		Tuples:    []Tuple{},
+	}
+	p.Space = p.calcSpace()
+	p.Capacity = p.getCapacity()
+
+	return p
+
 }
 
 func deserializePage(b []byte) *Page {
@@ -94,9 +136,53 @@ func (p *Page) getTuplesByTuples(input []Tuple) []Tuple {
 
 func (p *Page) serialize() []byte {
 	b := []byte{}
-	// b = append(b, p.Header.serialize()...)
-	// binary.BigEndian.PutUint64(b, uint64(p.LatestUse))
+
+	b = append(b, p.BinaryEncodingVersion.serialize()...)
+	b = append(b, p.HeaderLength)
+	binary.BigEndian.AppendUint16(b, uint16(p.PageOffset))
+	binary.BigEndian.AppendUint16(b, uint16(p.SlotOffset))
+
+	binary.BigEndian.AppendUint16(b, uint16(p.PageID))
+	binary.BigEndian.AppendUint16(b, uint16(p.TableID))
+	binary.BigEndian.AppendUint16(b, uint16(p.ColumnID))
+	var typeInt int
+	switch p.PageContentType {
+	case "int":
+		typeInt = 0
+	case "smallint":
+		typeInt = 1
+	case "tinyint":
+		typeInt = 2
+	case "text":
+		typeInt = 3
+	}
+	b = append(b, uint8(typeInt))
+	binary.BigEndian.AppendUint64(b, uint64(p.LatestUse))
+	b = append(b, uint8(p.TypeSize))
+	binary.BigEndian.AppendUint16(b, uint16(p.Capacity))
+	binary.BigEndian.AppendUint16(b, uint16(p.Space[0]))
+	binary.BigEndian.AppendUint16(b, uint16(p.Space[1]))
+	var dirtyInt int
+	switch p.isDirty {
+	case true:
+		dirtyInt = 1
+	case false:
+		dirtyInt = 0
+	}
+	b = append(b, uint8(dirtyInt))
+	b = append(b, p.pinCount)
+
+	for _, s := range p.SlotArray {
+		binary.BigEndian.AppendUint32(b, s.RowID)
+		binary.BigEndian.AppendUint16(b, s.Offset)
+	}
+	for _, t := range p.Tuples {
+		binary.BigEndian.AppendUint32(b, t.RowID) // remove the rowID later. Not strictly necessary, takes up a lot of space, useful in testing phase
+		b = append(b, t.Value...)
+	}
+
 	return b
+
 }
 
 func (p *Page) getSize() uint8 {
@@ -105,7 +191,13 @@ func (p *Page) getSize() uint8 {
 }
 func (p *Page) getCapacity() uint16 {
 	// returns how many tuples still fit in the page
-	return (PAGE_SIZE - uint16(p.getSize())) / uint16(p.TypeSize)
+	return (PAGE_SIZE - uint16(p.getSize())) / (uint16(p.TypeSize) + uint16(ROWIDSIZE))
+}
+func (p *Page) calcSpace() [2]uint16 {
+	// returns how many tuples still fit in the page
+	a := uint16(HEADER_SIZE) + SLOT_SIZE*uint16(len(p.Tuples))
+	b := PAGE_SIZE - uint16(len(p.Tuples))*(uint16(ROWIDSIZE)+uint16(p.TypeSize))
+	return [2]uint16{a, b}
 }
 
 func (p *Page) appendTuple(tup Tuple) {
@@ -117,36 +209,34 @@ func (p *Page) updateTuple(tup Tuple) {
 	p.Tuples[tup.RowID] = tup
 }
 
-const HEADER_SIZE = uint8(14)
+// type Header struct {
+// 	HeaderLength    uint8  // length of this header
+// 	PageID          uint16 // id of the page. Used in the page table to find the page
+// 	TableID         uint16
+// 	ColumnID        uint8
+// 	PageContentType uint8  // 256 types of data. every number represent a type
+// 	PageOffset      uint16 // bytes offset where in the db file does this page start // the type depends on the PAGE_SIZE
+// 	SlotOffset      uint32 // where does the slotarray start
+// }
 
-type Header struct {
-	HeaderLength    uint8  // length of this header
-	PageID          uint16 // id of the page. Used in the page table to find the page
-	TableID         uint16
-	ColumnID        uint8
-	PageContentType uint8  // 256 types of data. every number represent a type
-	PageOffset      uint16 // bytes offset where in the db file does this page start // the type depends on the PAGE_SIZE
-	SlotOffset      uint32 // where does the slotarray start
-}
+// func deserializeHeader(b []byte) Header {
+// 	// creates a header structure from a bytes slice
 
-func deserializeHeader(b []byte) Header {
-	// creates a header structure from a bytes slice
+// 	return Header{}
+// }
 
-	return Header{}
-}
-
-func (h *Header) serialize() []byte {
-	b := []byte{}
-	b = append(b, h.HeaderLength)
-	// binary.BigEndian.PutUint16(b, h.HeaderLength)
-	binary.BigEndian.PutUint16(b[2:], h.PageID)
-	binary.BigEndian.PutUint16(b[4:], h.TableID)
-	b = append(b, h.ColumnID)
-	b = append(b, h.PageContentType)
-	binary.BigEndian.PutUint16(b[6:], h.PageOffset)
-	binary.BigEndian.PutUint32(b[8:], h.SlotOffset)
-	return b
-}
+// func (h *Header) serialize() []byte {
+// 	b := []byte{}
+// 	b = append(b, h.HeaderLength)
+// 	// binary.BigEndian.PutUint16(b, h.HeaderLength)
+// 	binary.BigEndian.PutUint16(b[2:], h.PageID)
+// 	binary.BigEndian.PutUint16(b[4:], h.TableID)
+// 	b = append(b, h.ColumnID)
+// 	b = append(b, h.PageContentType)
+// 	binary.BigEndian.PutUint16(b[6:], h.PageOffset)
+// 	binary.BigEndian.PutUint32(b[8:], h.SlotOffset)
+// 	return b
+// }
 
 const SLOT_SIZE = uint16(6)
 

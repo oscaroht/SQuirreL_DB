@@ -77,16 +77,16 @@ func (bm *BufferManager) bufferNewTable(tab *TableDescription) {
 
 	for i, c := range tab.Columns {
 		// h := Header{HeaderLength: HEADER_SIZE, PageID: uint16(i), TableID: uint16(1)}
-		var typeSize int8
+		var typeSize uint8
 		switch c.ColumnType { // maybe better to store this somewhere instead of a random switch here
 		case "tinyint":
-			typeSize = int8(1)
+			typeSize = uint8(1)
 		case "smallint":
-			typeSize = int8(2)
+			typeSize = uint8(2)
 		case "int":
-			typeSize = int8(4)
+			typeSize = uint8(4)
 		case "text":
-			typeSize = int8(64) // should have no max capacity not lets be easy for now
+			typeSize = uint8(64) // should have no max capacity not lets be easy for now
 		}
 
 		p := Page{HeaderLength: HEADER_SIZE, PageID: PageID(i), TableID: TableID(1), LatestUse: uint64(time.Now().UnixMilli()), PageContentType: c.ColumnType, TypeSize: typeSize}
