@@ -95,3 +95,15 @@ func (bm *BufferManager) bufferNewTable(tab *TableDescription) {
 	}
 
 }
+
+func (bm *BufferManager) flush() {
+
+	for _, page := range bm.BufferPool {
+		if page != nil {
+			slog.Warn("Page to write", "page", page)
+			dm.writePage(page)
+		}
+
+	}
+
+}

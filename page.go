@@ -52,7 +52,7 @@ type Page struct {
 	BinaryEncodingVersion semanticVersion // version of the encoding. Depending on the version the (de)serialization changes.
 	HeaderLength          uint8           // length of this header
 	PageOffset            uint16          // bytes offset where in the db file does this page start // the type depends on the PAGE_SIZE
-	SlotOffset            uint32          // where does the slotarray start
+	SlotOffset            uint32          // where does the slotarray start from the beginning of the page
 
 	PageID          PageID
 	TableID         TableID
@@ -85,6 +85,7 @@ func NewPage(pid PageID, tid TableID, pctype string, ts uint8) Page {
 		SlotArray: []Slot{},
 		Tuples:    []Tuple{},
 	}
+	p.PageOffset = dm.createNewPage()
 	p.Space = p.calcSpace()
 	p.Capacity = p.getCapacity()
 
@@ -194,7 +195,7 @@ func (p *Page) getCapacity() uint16 {
 	return (PAGE_SIZE - uint16(p.getSize())) / (uint16(p.TypeSize) + uint16(ROWIDSIZE))
 }
 func (p *Page) calcSpace() [2]uint16 {
-	// returns how many tuples still fit in the page
+	// returns wherea new tuple should be inserted
 	a := uint16(HEADER_SIZE) + SLOT_SIZE*uint16(len(p.Tuples))
 	b := PAGE_SIZE - uint16(len(p.Tuples))*(uint16(ROWIDSIZE)+uint16(p.TypeSize))
 	return [2]uint16{a, b}
