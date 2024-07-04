@@ -53,7 +53,7 @@ func getExecutor(file string) func(string) {
 			fmt.Print("Goodbye!\n")
 			os.Exit(0)
 		case ".new":
-			err := os.WriteFile("db.squirrel", []byte(""), 0755)
+			err := os.WriteFile("squirrel.db", []byte(""), 0755)
 			if err != nil {
 				fmt.Printf("unable to write file: %w", err)
 			}

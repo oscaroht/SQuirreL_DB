@@ -39,7 +39,7 @@ func NewDiskManager() *DiskManager {
 func (d *DiskManager) readPage(pid PageID) (*Page, error) {
 	offset := d.PageMap[pid]
 
-	f, err := os.OpenFile("db.squirrel", os.O_RDWR|os.O_CREATE, 0644)
+	f, err := os.OpenFile("squirrel.db", os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		slog.Error("Unable to open/create file.", "Error", err)
 		return nil, &DiskError{msg: "Unable to open or create database file"}
@@ -71,7 +71,7 @@ func (d *DiskManager) writePage(p *Page) {
 
 	b := p.serialize()
 
-	f, err := os.OpenFile("db.squirrel", os.O_RDWR|os.O_CREATE, 0644)
+	f, err := os.OpenFile("squirrel.db", os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		panic(err)
 	}
@@ -91,7 +91,7 @@ func (d *DiskManager) createNewPage() uint16 {
 
 	b := make([]byte, PAGE_SIZE)
 
-	f, err := os.OpenFile("db.squirrel", os.O_RDWR|os.O_CREATE, 0644)
+	f, err := os.OpenFile("squirrel.db", os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		panic(err)
 	}
